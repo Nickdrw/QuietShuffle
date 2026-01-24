@@ -563,7 +563,8 @@ addon.CreateHistoryWindow = function()
 
     local bg = frame:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(frame)
-    bg:SetColorTexture(0.05, 0.05, 0.08, 0.95)
+    bg:SetColorTexture(0.05, 0.05, 0.08, 0.75)
+
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", frame, "TOP", 0, -5)
@@ -580,6 +581,7 @@ addon.CreateHistoryWindow = function()
     })
     sessionPanel:SetBackdropColor(0.1, 0.1, 0.15, 0.9)
     sessionPanel:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
+
 
     local sessionScrollFrame = CreateFrame("ScrollFrame", "QuietShuffleSessionScroll", sessionPanel, "UIPanelScrollFrameTemplate")
     sessionScrollFrame:SetPoint("TOPLEFT", sessionPanel, "TOPLEFT", 5, -5)
@@ -616,6 +618,19 @@ addon.CreateHistoryWindow = function()
     messagePanel:SetBackdropColor(0.1, 0.1, 0.15, 0.9)
     messagePanel:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
 
+    if addon.messageBackground then
+        local messageBg = messagePanel:CreateTexture(nil, "BACKGROUND")
+        messageBg:SetTexture(addon.messageBackground)
+        messageBg:SetAlpha(0.25)
+        messageBg:SetTexCoord(0, 1, 0, 1)
+        local mw, mh = messagePanel:GetSize()
+        local size = math.min(mw or 0, mh or 0)
+        messageBg:SetSize(size, size)
+        messageBg:SetPoint("CENTER", messagePanel, "CENTER", 0, 0)
+        messagePanel.bgImage = messageBg
+    end
+
+
     local msgLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     msgLabel:SetPoint("TOPLEFT", messagePanel, "TOPLEFT", 5, 22)
     msgLabel:SetText("|cFFFFD700Messages|r")
@@ -633,14 +648,7 @@ addon.CreateHistoryWindow = function()
     local reportPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     reportPanel:SetPoint("TOPLEFT", messagePanel, "BOTTOMLEFT", 0, -8)
     reportPanel:SetPoint("BOTTOMRIGHT", messagePanel, "BOTTOMRIGHT", 0, -40)
-    reportPanel:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
-    reportPanel:SetBackdropColor(0.08, 0.08, 0.12, 0.9)
-    reportPanel:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
+    -- No backdrop; button sits directly below the message panel.
 
     local reportToggleButton = CreateFrame("Button", nil, reportPanel, "UIPanelButtonTemplate")
     reportToggleButton:SetPoint("CENTER", reportPanel, "CENTER", 0, 0)
@@ -685,6 +693,12 @@ addon.CreateHistoryWindow = function()
 end
 
 addon.ShowHistoryWindow = function()
+    if SettingsPanel and SettingsPanel:IsShown() then
+        HideUIPanel(SettingsPanel)
+    elseif InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown() then
+        InterfaceOptionsFrame:Hide()
+    end
+
     if not addon.historyFrame then
         addon.CreateHistoryWindow()
     end

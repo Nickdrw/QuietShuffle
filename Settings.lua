@@ -36,6 +36,15 @@ end
 local function CreateSettingsPanel()
     local panel = CreateFrame("Frame")
 
+    if addon.historyBackground then
+        local bgImage = panel:CreateTexture(nil, "BACKGROUND")
+        bgImage:SetTexture(addon.historyBackground)
+        bgImage:SetAlpha(0.25)
+        bgImage:SetTexCoord(0, 1, 0, 1)
+        bgImage:SetAllPoints(panel)
+        panel.bgImage = bgImage
+    end
+
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
     title:SetText("QuietShuffle")
@@ -65,6 +74,33 @@ local function CreateSettingsPanel()
         end
     end)
 
+    local minimapCheckbox = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
+    minimapCheckbox:SetPoint("TOPLEFT", clearButton, "BOTTOMLEFT", 0, -12)
+    minimapCheckbox.Text:SetText("Show Minimap Button")
+    minimapCheckbox:SetScript("OnClick", function(self)
+        QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
+        QuietShuffleLDBIconDB.hide = not self:GetChecked()
+        local icon = LibStub and LibStub("LibDBIcon-1.0", true)
+        if icon then
+            if QuietShuffleLDBIconDB.hide then
+                icon:Hide(addon.name)
+            else
+                icon:Show(addon.name)
+            end
+        elseif addon.minimapButton then
+            if QuietShuffleLDBIconDB.hide then
+                addon.minimapButton:Hide()
+            else
+                addon.minimapButton:Show()
+            end
+        end
+    end)
+
+    panel:HookScript("OnShow", function()
+        QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
+        minimapCheckbox:SetChecked(not QuietShuffleLDBIconDB.hide)
+    end)
+
     return panel
 end
 
@@ -73,10 +109,12 @@ local function RegisterSettingsPanel()
         local panel = CreateSettingsPanel()
         local category = Settings.RegisterCanvasLayoutCategory(panel, addon.name)
         Settings.RegisterAddOnCategory(category)
+        addon.settingsCategory = category
     elseif InterfaceOptions_AddCategory then
         local panel = CreateSettingsPanel()
         panel.name = addon.name
         InterfaceOptions_AddCategory(panel)
+        addon.settingsCategory = panel
     end
 end
 

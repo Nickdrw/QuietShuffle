@@ -191,6 +191,12 @@ frame:SetScript("OnEvent", function(self, event)
         end
         addon.SetActiveCharacter(currentKey)
 
+        if addon.RegisterMinimapIcon and addon.RegisterMinimapIcon() then
+            -- LibDBIcon handled
+        elseif addon.CreateMinimapButton then
+            addon.CreateMinimapButton()
+        end
+
         print("|cFFFFFF00" .. addon.name .. "|r: Ready! Use /qs history to view messages or /qs for help.")
 
         SLASH_QUIETSHUFFLE1 = "/qs"

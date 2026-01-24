@@ -172,5 +172,187 @@ addon.GetColoredCharacterLabel = function(key)
     return key
 end
 
+addon.OpenSettingsPanel = function()
+    if Settings and Settings.OpenToCategory and addon.settingsCategory then
+        if addon.settingsCategory.GetID then
+            Settings.OpenToCategory(addon.settingsCategory:GetID())
+        else
+            Settings.OpenToCategory(addon.settingsCategory)
+        end
+        return
+    end
+    if InterfaceOptionsFrame_OpenToCategory and addon.settingsCategory then
+        InterfaceOptionsFrame_OpenToCategory(addon.settingsCategory)
+    end
+end
+
+addon.ToggleHistoryWindow = function()
+    if addon.historyFrame and addon.historyFrame:IsShown() then
+        addon.historyFrame:Hide()
+        return
+    end
+    if addon.ShowHistoryWindow then
+        addon.ShowHistoryWindow()
+    end
+end
+
+-- ============================================================================
+-- MINIMAP BUTTON
+-- ============================================================================
+
+addon.minimapIcon = "Interface/AddOns/QuietShuffle/Media/quietshuffleicon.tga"
+addon.historyBackground = "Interface/AddOns/QuietShuffle/Media/quietshuffle_logo"
+addon.messageBackground = "Interface/AddOns/QuietShuffle/Media/quietshuffle_logo_bubble"
+
+addon.RegisterMinimapIcon = function()
+    if addon.minimapRegistered then
+        return true
+    end
+
+    if not LibStub then
+        return false
+    end
+
+    local ldb = LibStub("LibDataBroker-1.1", true)
+    local ldbi = LibStub("LibDBIcon-1.0", true)
+    if not ldb or not ldbi then
+        return false
+    end
+
+    local dataobj = ldb:NewDataObject(addon.name, {
+        type = "launcher",
+        text = addon.name,
+        icon = addon.minimapIcon,
+    })
+
+    function dataobj.OnClick(_, mouseButton)
+        if mouseButton == "LeftButton" then
+            if addon.ToggleHistoryWindow then
+                addon.ToggleHistoryWindow()
+            end
+        elseif mouseButton == "RightButton" then
+            if addon.OpenSettingsPanel then
+                addon.OpenSettingsPanel()
+            end
+        end
+    end
+
+    function dataobj.OnTooltipShow(tt)
+        tt:AddLine("QuietShuffle")
+        tt:AddLine("Left Click: Open History", 0.9, 0.9, 0.9)
+        tt:AddLine("Right Click: Open Settings", 0.9, 0.9, 0.9)
+    end
+
+    QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
+    ldbi:Register(addon.name, dataobj, QuietShuffleLDBIconDB)
+    addon.minimapRegistered = true
+    return true
+end
+
+local function GetMinimapSettings()
+    addon.savedData = addon.savedData or {}
+    addon.savedData.minimap = addon.savedData.minimap or { hide = false, angle = 225 }
+    return addon.savedData.minimap
+end
+
+local function Atan2(y, x)
+    if math.atan2 then
+        return math.atan2(y, x)
+    end
+    return math.atan(y, x)
+end
+
+addon.UpdateMinimapButtonPosition = function()
+    if not addon.minimapButton or not Minimap then
+        return
+    end
+    local settings = GetMinimapSettings()
+    local angle = settings.angle or 225
+    local radius = 80
+    local x = math.cos(math.rad(angle)) * radius
+    local y = math.sin(math.rad(angle)) * radius
+    addon.minimapButton:ClearAllPoints()
+    addon.minimapButton:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+
+addon.CreateMinimapButton = function()
+    if addon.minimapButton or not Minimap then
+        return
+    end
+
+    local settings = GetMinimapSettings()
+
+    local button = CreateFrame("Button", "QuietShuffleMinimapButton", Minimap)
+    button:SetFrameStrata("MEDIUM")
+    button:SetSize(32, 32)
+
+    button:SetNormalTexture(addon.minimapIcon or "Interface/Icons/INV_Misc_QuestionMark")
+    local icon = button:GetNormalTexture()
+    icon:ClearAllPoints()
+    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+    icon:SetSize(32, 32)
+    icon:SetTexCoord(0, 1, 0, 1)
+
+    button:SetHighlightTexture("Interface/Minimap/UI-Minimap-ZoomButton-Highlight")
+
+    local border = button:CreateTexture(nil, "BACKGROUND")
+    border:SetTexture("Interface/Minimap/MiniMap-TrackingBorder")
+    border:SetSize(56, 56)
+    border:SetPoint("CENTER")
+    button.border = border
+
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:SetScript("OnClick", function(_, mouseButton)
+        if mouseButton == "LeftButton" then
+            if addon.ToggleHistoryWindow then
+                addon.ToggleHistoryWindow()
+            end
+        elseif mouseButton == "RightButton" then
+            if addon.OpenSettingsPanel then
+                addon.OpenSettingsPanel()
+            end
+        end
+    end)
+
+    button:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("QuietShuffle")
+        GameTooltip:AddLine("Left Click: Open History", 1, 1, 1)
+        GameTooltip:AddLine("Right Click: Open Settings", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    button:RegisterForDrag("LeftButton")
+    button:SetScript("OnDragStart", function(self)
+        self:SetScript("OnUpdate", function(self)
+            local mx, my = Minimap:GetCenter()
+            local cx, cy = GetCursorPosition()
+            local scale = Minimap:GetEffectiveScale()
+            cx, cy = cx / scale, cy / scale
+            local angle = math.deg(Atan2(cy - my, cx - mx))
+            settings.angle = angle
+            addon.UpdateMinimapButtonPosition()
+        end)
+    end)
+
+    button:SetScript("OnDragStop", function(self)
+        self:SetScript("OnUpdate", nil)
+        addon.UpdateMinimapButtonPosition()
+    end)
+
+    addon.minimapButton = button
+
+    if settings.hide then
+        button:Hide()
+    else
+        button:Show()
+        addon.UpdateMinimapButtonPosition()
+    end
+end
+
 -- Initialization message
 print("|cFFFFFF00" .. addon.name .. " v" .. addon.version .. "|r: Loaded! Type /qs for status.")
