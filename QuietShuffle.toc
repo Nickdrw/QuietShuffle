@@ -3,7 +3,11 @@
 ## Notes: QuietShuffle allows you to hide every communication channel from your solo shuffle lobby
 ## Author: NickDrew
 ## Version: 1.0.0
-## SavedVariables: QuietShuffleSavedData
+## SavedVariables: QuietShuffleSavedData, QuietShuffleLDBIconDB
+
+Libs/LibStub/LibStub.lua
+Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
+Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua
 
 Core.lua
 Filters.lua
