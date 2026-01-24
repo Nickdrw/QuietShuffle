@@ -1,3 +1,7 @@
+<p align="center">
+	<img src="media/quietshuffle_logo_2.png" alt="QuietShuffle Logo" />
+</p>
+
 # QuietShuffle
 
 Tired of being rage‑baited during your games? QuietShuffle lets you play the way you want, the best you can, without getting disturbed by ragers. After the game, you can peacefully review messages and take action if necessary. Compatible with **TWW** and **Midnight**.
