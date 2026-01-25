@@ -35,17 +35,48 @@ local function RestoreChatBubbles()
     end
 end
 
+addon.DisableChatBubbles = DisableChatBubbles
+addon.RestoreChatBubbles = RestoreChatBubbles
+
 -- Determine if we're in a Solo Shuffle match
 addon.IsSoloShuffleMatch = function()
     if addon.isTestMode then
         return true
     end
+    local function IsSoloShuffleByStats()
+        if not C_PvP or not C_PvP.GetMatchPVPStatIDs or not C_PvP.GetMatchPVPStatInfo then
+            return false
+        end
+        local ids = C_PvP.GetMatchPVPStatIDs()
+        if type(ids) ~= "table" then
+            return false
+        end
+        for _, id in ipairs(ids) do
+            local info = C_PvP.GetMatchPVPStatInfo(id)
+            local name = info and info.name or info
+            if type(name) == "string" then
+                if name:find("Round") or name:find("Shuffle") then
+                    return true
+                end
+            end
+        end
+        return false
+    end
     if C_PvP then
+        if C_PvP.IsSoloShuffleMatch and C_PvP.IsSoloShuffleMatch() then
+            return true
+        end
         if C_PvP.IsSoloShuffle and C_PvP.IsSoloShuffle() then
             return true
         end
         if C_PvP.IsRatedSoloShuffle and C_PvP.IsRatedSoloShuffle() then
             return true
+        end
+        if C_PvP.GetActiveMatchBracket and Enum and Enum.PvPBracketType then
+            local bracket = C_PvP.GetActiveMatchBracket()
+            if bracket == Enum.PvPBracketType.SoloShuffle then
+                return true
+            end
         end
     end
 
@@ -53,6 +84,12 @@ addon.IsSoloShuffleMatch = function()
         or (IsInScenario and IsInScenario())
         or false
     if inScenario then
+        if C_Scenario and C_Scenario.GetInfo then
+            local name = C_Scenario.GetInfo()
+            if type(name) == "string" and name:find("Solo Shuffle") then
+                return true
+            end
+        end
         local scenarioID
         if C_Scenario and C_Scenario.GetScenarioID then
             scenarioID = C_Scenario.GetScenarioID()
@@ -64,12 +101,47 @@ addon.IsSoloShuffleMatch = function()
         end
     end
 
+    if IsInInstance then
+        local _, instanceType = IsInInstance()
+        if instanceType == "arena" then
+            if GetBattlefieldStatus then
+                for i = 1, 4 do
+                    local status, name = GetBattlefieldStatus(i)
+                    if status == "active" and type(name) == "string" and name:find("Solo Shuffle") then
+                        return true
+                    end
+                end
+            end
+            if C_PvP and C_PvP.GetActiveMatchBracket and Enum and Enum.PvPBracketType then
+                local bracket = C_PvP.GetActiveMatchBracket()
+                if bracket == Enum.PvPBracketType.SoloShuffle then
+                    return true
+                end
+            end
+            if IsSoloShuffleByStats() then
+                return true
+            end
+            local groupSize = GetNumGroupMembers and GetNumGroupMembers() or 0
+            if groupSize >= 6 then
+                return true
+            end
+            if C_Scenario and C_Scenario.GetInfo then
+                local name = C_Scenario.GetInfo()
+                if type(name) == "string" and name:find("Solo Shuffle") then
+                    return true
+                end
+            end
+        end
+    end
+
     return false
 end
 
 -- Build list of current Solo Shuffle match players
 addon.RefreshMatchPlayers = function()
     addon.matchPlayers = {}
+    addon.matchPlayersFull = {}
+    addon.matchPlayerGuids = {}
 
     local groupType = 0
     if IsInRaid and IsInRaid() then
@@ -81,13 +153,36 @@ addon.RefreshMatchPlayers = function()
     local groupSize = GetNumGroupMembers and GetNumGroupMembers() or 0
 
     if groupType == 0 then
-        addon.matchPlayers[GetUnitName("player")] = true
+        local name, realm = UnitFullName("player")
+        realm = realm or GetRealmName()
+        local shortName = name or GetUnitName("player")
+        local fullName = (shortName and realm) and (shortName .. "-" .. realm) or shortName
+        local guid = UnitGUID and UnitGUID("player")
+        if shortName then
+            addon.matchPlayers[shortName] = true
+        end
+        if fullName then
+            addon.matchPlayersFull[fullName] = true
+        end
+        if guid then
+            addon.matchPlayerGuids[guid] = true
+        end
     else
         for i = 1, groupSize do
             local unitID = (groupType == 1) and ("party" .. i) or ("raid" .. i)
-            local name = GetUnitName(unitID)
-            if name then
-                addon.matchPlayers[name] = true
+            local name, realm = UnitFullName(unitID)
+            realm = realm or GetRealmName()
+            local shortName = name or GetUnitName(unitID)
+            local fullName = (shortName and realm) and (shortName .. "-" .. realm) or shortName
+            local guid = UnitGUID and UnitGUID(unitID)
+            if shortName then
+                addon.matchPlayers[shortName] = true
+            end
+            if fullName then
+                addon.matchPlayersFull[fullName] = true
+            end
+            if guid then
+                addon.matchPlayerGuids[guid] = true
             end
         end
     end
@@ -95,6 +190,15 @@ end
 
 -- Check if we're in Solo Shuffle and toggle muting accordingly
 addon.CheckSoloShuffleStatus = function()
+    if addon.IsEnabled and not addon.IsEnabled() then
+        if addon.filteringEnabled and addon.DisableMessageFiltering then
+            addon.DisableMessageFiltering()
+        end
+        if addon.RestoreChatBubbles then
+            addon.RestoreChatBubbles()
+        end
+        return
+    end
     local inSoloShuffleMatch = addon.IsSoloShuffleMatch()
 
     if inSoloShuffleMatch then
@@ -109,8 +213,13 @@ addon.CheckSoloShuffleStatus = function()
             addon.SetActiveCharacter(currentKey)
             DisableChatBubbles()
             addon.matchPlayers = {}
+            addon.matchPlayersFull = {}
+            addon.matchPlayerGuids = {}
             addon.RefreshMatchPlayers()
-            print("|cFFFFFF00" .. addon.name .. "|r: Solo Shuffle started! Muting communications from match players.")
+            addon.Print("Solo Shuffle started! Muting communications from match players.")
+            if addon.debugFilters then
+                addon.Print("inSoloShuffle=true")
+            end
         end
 
         if addon.EnableMessageFiltering then
@@ -119,11 +228,16 @@ addon.CheckSoloShuffleStatus = function()
     elseif not inSoloShuffleMatch and (addon.inSoloShuffle or addon.filteringEnabled) then
         addon.inSoloShuffle = false
         addon.matchPlayers = {}
+        addon.matchPlayersFull = {}
+        addon.matchPlayerGuids = {}
         if addon.DisableMessageFiltering then
             addon.DisableMessageFiltering()
         end
         RestoreChatBubbles()
-        print("|cFFFFFF00" .. addon.name .. "|r: Solo Shuffle ended! Messages unmuted.")
+        addon.Print("Solo Shuffle ended! Messages unmuted.")
+        if addon.debugFilters then
+            addon.Print("inSoloShuffle=false")
+        end
 
         local zoneName = GetRealZoneText() or "Unknown"
         local endTime = time()
@@ -145,11 +259,19 @@ addon.CheckSoloShuffleStatus = function()
         table.insert(history, sessionEntry)
 
         if addon.PrintStoredMessages then
-            addon.PrintStoredMessages()
+            if C_Timer and C_Timer.After then
+                C_Timer.After(2, addon.PrintStoredMessages)
+            else
+                addon.PrintStoredMessages()
+            end
         end
 
         addon.messages = {}
         addon.messageCounter = 0
+    else
+        if addon.chatBubbleState then
+            RestoreChatBubbles()
+        end
     end
 end
 

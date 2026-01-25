@@ -9,7 +9,7 @@ local function ClearHistory()
     for i = #history, 1, -1 do
         table.remove(history, i)
     end
-    print("|cFFFFFF00" .. addon.name .. "|r: History cleared!")
+    addon.Print("History cleared!")
     addon.selectedSessionIndex = nil
     if addon.PopulateSessionList then
         addon.PopulateSessionList()
@@ -74,8 +74,17 @@ local function CreateSettingsPanel()
         end
     end)
 
+    local enableCheckbox = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
+    enableCheckbox:SetPoint("TOPLEFT", clearButton, "BOTTOMLEFT", 0, -12)
+    enableCheckbox.Text:SetText("Enable QuietShuffle")
+    enableCheckbox:SetScript("OnClick", function(self)
+        if addon.SetEnabled then
+            addon.SetEnabled(self:GetChecked())
+        end
+    end)
+
     local minimapCheckbox = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
-    minimapCheckbox:SetPoint("TOPLEFT", clearButton, "BOTTOMLEFT", 0, -12)
+    minimapCheckbox:SetPoint("TOPLEFT", enableCheckbox, "BOTTOMLEFT", 0, -8)
     minimapCheckbox.Text:SetText("Show Minimap Button")
     minimapCheckbox:SetScript("OnClick", function(self)
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
@@ -97,6 +106,11 @@ local function CreateSettingsPanel()
     end)
 
     panel:HookScript("OnShow", function()
+        if addon.IsEnabled then
+            enableCheckbox:SetChecked(addon.IsEnabled())
+        else
+            enableCheckbox:SetChecked(true)
+        end
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
         minimapCheckbox:SetChecked(not QuietShuffleLDBIconDB.hide)
     end)

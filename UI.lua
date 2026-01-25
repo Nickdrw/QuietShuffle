@@ -6,11 +6,31 @@ local _, addon = ...
 
 -- Print stored messages (link to history)
 addon.PrintStoredMessages = function()
-    if next(addon.messages) == nil then
-        print("|cFFFFFF00" .. addon.name .. "|r: No messages stored.")
+    if addon.IsEnabled and not addon.IsEnabled() then
+        addon.Print("Disabled")
         return
     end
-    print("|cFFFFFF00" .. addon.name .. "|r: " .. "|Hquietshuffle:history|h|cFF00FF00[View Message History]|r|h")
+    local hasCurrent = addon.messages and #addon.messages > 0
+    local hasHistory = false
+    if addon.GetActiveHistory then
+        local history = addon.GetActiveHistory()
+        if history and #history > 0 then
+            for _, session in ipairs(history) do
+                if session and ((session.message_count and session.message_count > 0) or (session.messages and #session.messages > 0)) then
+                    hasHistory = true
+                    break
+                end
+            end
+        end
+    end
+
+    if not hasCurrent and not hasHistory then
+        addon.Print("No messages stored.")
+        return
+    end
+    addon.Print("------------------------------")
+    addon.Print("|Hquietshuffle:history|h|cFF00FF00[View Message History]|r|h")
+    addon.Print("------------------------------")
 end
 
 -- Build or reuse a row for message display
@@ -113,6 +133,23 @@ local function FormatChatMessageParts(msgData)
     local channelHex = "FFFFFF"
     local channelLabel = "[" .. channel .. "]"
 
+    if channel == "CHAT_MSG_EMOTE" or channel == "CHAT_MSG_TEXT_EMOTE" then
+        local c = ChatTypeInfo and ChatTypeInfo.EMOTE
+        if c then
+            channelHex = string.format("%02X%02X%02X", c.r * 255, c.g * 255, c.b * 255)
+        end
+        local emoteMessage = message
+        if type(emoteMessage) ~= "string" or emoteMessage == "" then
+            emoteMessage = "says something unintelligible"
+        end
+        return {
+            prefix = string.format("|cFF%s%s|r ", channelHex, timeStr),
+            name = string.format("|cFF%s%s|r", classHex, sender),
+            message = string.format("|cFF%s%s|r", channelHex, emoteMessage),
+            isEmote = true,
+        }
+    end
+
     if channel == "CHAT_MSG_WHISPER" then
         channelHex = "FF80FF"
         channelLabel = "[From]"
@@ -142,7 +179,8 @@ local function FormatChatMessageParts(msgData)
     return {
         prefix = string.format("|cFF%s%s|r |cFF%s%s|r ", channelHex, timeStr, channelHex, channelLabel),
         name = string.format("|cFF%s[%s]|r", classHex, sender),
-        message = message
+        message = message,
+        isEmote = false,
     }
 end
 
@@ -309,7 +347,11 @@ addon.ShowSessionMessages = function(sessionIndex)
                 row.isFiltered = false
                 row.messageText:SetPoint("TOPLEFT", row.nameText, "TOPRIGHT", 0, 0)
                 row.messageText:SetWordWrap(true)
-                row.messageText:SetText(": " .. rawMessage)
+                if parts.isEmote then
+                    row.messageText:SetText(" " .. rawMessage)
+                else
+                    row.messageText:SetText(": " .. rawMessage)
+                end
                 local available = math.max(10, row:GetWidth() - (prefixW + nameW))
                 row.messageText:SetWidth(available)
             end
@@ -339,24 +381,17 @@ addon.ShowSessionMessages = function(sessionIndex)
     end
 
     if sessionIndex == 0 then
+        if addon.inSoloShuffle then
+            AddRow("History is hidden during Solo Shuffle.")
+            UpdateReportButtons(nil)
+            return
+        end
         if not addon.inSoloShuffle and history and #history > 0 then
             AddRow("Select a session to view its messages.")
             UpdateReportButtons(nil)
             return
         end
-        if addon.messages and next(addon.messages) then
-            AddRow("|cFFFFFF00=== Current Session ===|r")
-            for _, msgData in ipairs(addon.messages) do
-                AddRow(nil, msgData)
-            end
-            reportMessages = addon.messages
-        else
-            if addon.inSoloShuffle then
-                AddRow("No message in current session.")
-            else
-                AddRow("No message for this character.")
-            end
-        end
+        AddRow("No message for this character.")
     else
         local session = history[sessionIndex]
         if session and session.messages and #session.messages > 0 then
@@ -399,70 +434,7 @@ addon.PopulateSessionList = function()
     local sessionCount = 0
     local messageCount = 0
 
-    if addon.inSoloShuffle then
-        sessionCount = sessionCount + 1
-        messageCount = 0
-        if addon.messages then
-            for _ in ipairs(addon.messages) do
-                messageCount = messageCount + 1
-            end
-        end
-
-        local currentZoneName = GetRealZoneText() or "Current Session"
-        local button = CreateFrame("Button", nil, addon.historySessionContentFrame, "BackdropTemplate")
-        button:SetSize(220, 28)
-        button:SetPoint("TOPLEFT", addon.historySessionContentFrame, "TOPLEFT", 5, yOffset)
-
-        button:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            tile = false, edgeSize = 1,
-            insets = { left = 0, right = 0, top = 0, bottom = 0 }
-        })
-        button:SetBackdropColor(0.15, 0.15, 0.2, 0.8)
-        button:SetBackdropBorderColor(0.3, 0.3, 0.4, 0.8)
-
-        local buttonText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        buttonText:SetPoint("LEFT", button, "LEFT", 8, 0)
-        buttonText:SetPoint("RIGHT", button, "RIGHT", -8, 0)
-        buttonText:SetJustifyH("LEFT")
-        buttonText:SetWordWrap(false)
-        buttonText:SetText(string.format("|cFF40FF40● |r|cFFFFFFFF[Current] %s|r", FormatMessageCount(messageCount)))
-
-        button:SetScript("OnEnter", function(self)
-            self:SetBackdropColor(0.25, 0.25, 0.35, 1)
-            buttonText:SetText(string.format("|cFF40FF40● |r|cFFFFD700[Current] %s|r", FormatMessageCount(messageCount)))
-            if GameTooltip then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetText(currentZoneName)
-            end
-        end)
-        button:SetScript("OnLeave", function(self)
-            if addon.selectedSessionIndex == 0 then
-                self:SetBackdropColor(0.2, 0.35, 0.5, 0.9)
-                buttonText:SetText(string.format("|cFF40FF40● |r|cFFFFD700[Current] %s|r", FormatMessageCount(messageCount)))
-            else
-                self:SetBackdropColor(0.15, 0.15, 0.2, 0.8)
-                buttonText:SetText(string.format("|cFF40FF40● |r|cFFFFFFFF[Current] %s|r", FormatMessageCount(messageCount)))
-            end
-            if GameTooltip then
-                GameTooltip:Hide()
-            end
-        end)
-
-        button:SetScript("OnClick", function()
-            addon.ShowSessionMessages(0)
-            addon.PopulateSessionList()
-        end)
-
-        if addon.selectedSessionIndex == 0 then
-            button:SetBackdropColor(0.2, 0.35, 0.5, 0.9)
-            buttonText:SetText(string.format("|cFF40FF40● |r|cFFFFD700[Current] %s|r", FormatMessageCount(messageCount)))
-        end
-
-        table.insert(addon.sessionButtons, button)
-        yOffset = yOffset - 32
-    end
+    -- Do not expose current-session messages during a match.
 
     local history = addon.GetActiveHistory()
     for i = #history, 1, -1 do
@@ -693,6 +665,10 @@ addon.CreateHistoryWindow = function()
 end
 
 addon.ShowHistoryWindow = function()
+    if addon.inSoloShuffle then
+        addon.Print("History is hidden during Solo Shuffle. Check after the match ends.")
+        return
+    end
     if SettingsPanel and SettingsPanel:IsShown() then
         HideUIPanel(SettingsPanel)
     elseif InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown() then
@@ -740,9 +716,7 @@ addon.ShowHistoryWindow = function()
 
     if not addon.selectedSessionIndex then
         local history = addon.GetActiveHistory()
-        if addon.messages and next(addon.messages) then
-            addon.selectedSessionIndex = 0
-        elseif #history > 0 then
+        if #history > 0 then
             addon.selectedSessionIndex = #history
         else
             addon.selectedSessionIndex = nil
@@ -763,6 +737,10 @@ hooksecurefunc("SetItemRef", function(link, text, button)
     if link and string.find(link, "^quietshuffle:") then
         local command = string.match(link, "^quietshuffle:([^:]+)")
         if command == "history" then
+            if addon.inSoloShuffle then
+                addon.Print("History is hidden during Solo Shuffle. Check after the match ends.")
+                return
+            end
             local history = addon.GetActiveHistory()
             if history and #history > 0 then
                 addon.selectedSessionIndex = #history
