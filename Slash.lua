@@ -10,15 +10,20 @@ SLASH_QUIETSHUFFLE2 = "/quietshuffle"
 SlashCmdList["QUIETSHUFFLE"] = function(msg)
     local command, arg = msg:match("^(%S+)%s*(.*)")
 
+    if addon.IsEnabled and not addon.IsEnabled() then
+        addon.Print("Disabled")
+        return
+    end
+
     if not command or command == "" then
         if addon.CheckSoloShuffleStatus then
             addon.CheckSoloShuffleStatus()
         end
         local inSoloShuffleMatch = addon.IsSoloShuffleMatch and addon.IsSoloShuffleMatch() or false
         if inSoloShuffleMatch then
-            print("|cFFFFFF00" .. addon.name .. "|r: Currently IN Solo Shuffle (muting active)")
+            addon.Print("Currently IN Solo Shuffle (muting active)")
         else
-            print("|cFFFFFF00" .. addon.name .. "|r: NOT in Solo Shuffle")
+            addon.Print("NOT in Solo Shuffle")
         end
         if addon.PrintStoredMessages then
             addon.PrintStoredMessages()
@@ -35,9 +40,10 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     end
 
 
+
     if command == "test" and arg == "stop" then
         if not addon.inSoloShuffle then
-            print("|cFFFFFF00" .. addon.name .. "|r: Solo Shuffle was not started. Use '/qs test start' first.")
+            addon.Print("Solo Shuffle was not started. Use '/qs test start' first.")
             return
         end
 
@@ -50,7 +56,7 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
 
     if command == "clear" then
         addon.messages = {}
-        print("|cFFFFFF00" .. addon.name .. "|r: Stored messages cleared.")
+        addon.Print("Stored messages cleared.")
         return
     end
 
@@ -61,10 +67,17 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         return
     end
 
-    print("|cFFFFFF00" .. addon.name .. "|r: Unknown command.")
-    print("  /qs - Show status")
-    print("  /qs history - Show message history window")
-    print("  /qs test start - Simulate Solo Shuffle start")
-    print("  /qs test stop - Simulate Solo Shuffle end")
-    print("  /qs clear - Clear current messages")
+    if command == "debug" and (arg == "on" or arg == "off") then
+        addon.debugFilters = (arg == "on")
+        addon.Print("Debug " .. (addon.debugFilters and "enabled" or "disabled") .. ".")
+        return
+    end
+
+    addon.Print("Unknown command.")
+    addon.Print("/qs - Show status")
+    addon.Print("/qs history - Show message history window")
+    addon.Print("/qs test start - Simulate Solo Shuffle start")
+    addon.Print("/qs test stop - Simulate Solo Shuffle end")
+    addon.Print("/qs clear - Clear current messages")
+    addon.Print("/qs debug on|off - Toggle filter debug")
 end

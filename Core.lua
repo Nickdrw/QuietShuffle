@@ -4,15 +4,34 @@
 
 local _, addon = ...
 
+_G.QuietShuffle = addon
+
 addon.name = "QuietShuffle"
 addon.version = "1.0.0"
+
+addon.GetChatPrefix = function()
+    local icon = addon.chatIcon or addon.minimapIcon or "Interface/Icons/INV_Misc_QuestionMark"
+    local quiet = "|cFF2FAEF7Quiet|r"
+    local shuffle = "|cFF7B579CShuffle|r"
+    return string.format("|T%s:16:16:0:0:64:64:0:64:0:64|t %s%s:", icon, quiet, shuffle)
+end
+
+addon.Print = function(...)
+    local parts = { ... }
+    for i = 1, #parts do
+        parts[i] = tostring(parts[i])
+    end
+    local msg = table.concat(parts, " ")
+    print(addon.GetChatPrefix() .. " " .. msg)
+end
 
 -- ============================================================================
 -- SAVEDVARIABLES SETUP - Initialize persistent storage
 -- ============================================================================
 
 addon.savedData = {
-    history = {}
+    history = {},
+    enabled = true
 }
 
 -- ============================================================================
@@ -30,6 +49,34 @@ addon.filteringEnabled = false
 
 -- Track if we're in test mode (for testing without real match)
 addon.isTestMode = false
+addon.debugFilters = false
+
+-- Track whether addon features are enabled
+addon.IsEnabled = function()
+    return addon.savedData == nil or addon.savedData.enabled ~= false
+end
+
+addon.SetEnabled = function(enabled)
+    addon.savedData = addon.savedData or {}
+    addon.savedData.enabled = enabled and true or false
+    if not addon.savedData.enabled then
+        if addon.DisableMessageFiltering then
+            addon.DisableMessageFiltering()
+        end
+        addon.filteringEnabled = false
+        addon.inSoloShuffle = false
+        addon.matchPlayers = {}
+        addon.matchPlayersFull = {}
+        addon.matchPlayerGuids = {}
+        if addon.RestoreChatBubbles then
+            addon.RestoreChatBubbles()
+        end
+    else
+        if addon.CheckSoloShuffleStatus then
+            addon.CheckSoloShuffleStatus()
+        end
+    end
+end
 
 -- Track session buttons we create
 addon.sessionButtons = {}
@@ -65,12 +112,19 @@ addon.CHAT_FILTER_EVENTS = {
     "CHAT_MSG_PARTY",
     "CHAT_MSG_PARTY_LEADER",
     "CHAT_MSG_PARTY_GUIDE",
+    "CHAT_MSG_PARTY_SAY",
     "CHAT_MSG_INSTANCE_CHAT",
     "CHAT_MSG_INSTANCE_CHAT_LEADER",
+    "CHAT_MSG_BATTLEGROUND",
+    "CHAT_MSG_BATTLEGROUND_LEADER",
+    "CHAT_MSG_ARENA",
+    "CHAT_MSG_ARENA_LEADER",
     "CHAT_MSG_WHISPER",
     "CHAT_MSG_WHISPER_INFORM",
     "CHAT_MSG_SAY",
     "CHAT_MSG_YELL",
+    "CHAT_MSG_EMOTE",
+    "CHAT_MSG_TEXT_EMOTE",
 }
 
 -- Helper to get table keys
@@ -201,6 +255,7 @@ end
 -- ============================================================================
 
 addon.minimapIcon = "Interface/AddOns/QuietShuffle/Media/quietshuffleicon.tga"
+addon.chatIcon = "Interface/AddOns/QuietShuffle/Media/quietshuffleicon16x16_straight_alpha.tga"
 addon.historyBackground = "Interface/AddOns/QuietShuffle/Media/quietshuffle_logo"
 addon.messageBackground = "Interface/AddOns/QuietShuffle/Media/quietshuffle_logo_bubble"
 
@@ -355,4 +410,4 @@ addon.CreateMinimapButton = function()
 end
 
 -- Initialization message
-print("|cFFFFFF00" .. addon.name .. " v" .. addon.version .. "|r: Loaded! Type /qs for status.")
+addon.Print("v" .. addon.version .. ": Loaded! Type /qs for status.")
