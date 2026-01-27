@@ -139,6 +139,9 @@ end
 
 -- Build list of current Solo Shuffle match players
 addon.RefreshMatchPlayers = function()
+    addon.matchPlayers = addon.matchPlayers or {}
+    addon.matchPlayersFull = addon.matchPlayersFull or {}
+    addon.matchPlayerGuids = addon.matchPlayerGuids or {}
     wipe(addon.matchPlayers)
     wipe(addon.matchPlayersFull)
     wipe(addon.matchPlayerGuids)
@@ -212,6 +215,9 @@ addon.CheckSoloShuffleStatus = function()
             end
             addon.SetActiveCharacter(currentKey)
             DisableChatBubbles()
+            addon.matchPlayers = addon.matchPlayers or {}
+            addon.matchPlayersFull = addon.matchPlayersFull or {}
+            addon.matchPlayerGuids = addon.matchPlayerGuids or {}
             wipe(addon.matchPlayers)
             wipe(addon.matchPlayersFull)
             wipe(addon.matchPlayerGuids)
@@ -227,6 +233,9 @@ addon.CheckSoloShuffleStatus = function()
         end
     elseif not inSoloShuffleMatch and (addon.inSoloShuffle or addon.filteringEnabled) then
         addon.inSoloShuffle = false
+        addon.matchPlayers = addon.matchPlayers or {}
+        addon.matchPlayersFull = addon.matchPlayersFull or {}
+        addon.matchPlayerGuids = addon.matchPlayerGuids or {}
         wipe(addon.matchPlayers)
         wipe(addon.matchPlayersFull)
         wipe(addon.matchPlayerGuids)
@@ -309,6 +318,7 @@ addon.CheckSoloShuffleStatus = function()
             addon.PrintStoredMessages()
         end
 
+        addon.messages = addon.messages or {}
         wipe(addon.messages)
         addon.messageCounter = 0
     else
