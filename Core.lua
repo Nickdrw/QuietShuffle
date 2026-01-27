@@ -16,13 +16,62 @@ addon.GetChatPrefix = function()
     return string.format("|T%s:16:16:0:0:64:64:0:64:0:64|t %s%s:", icon, quiet, shuffle)
 end
 
+-- Find a chat frame by name (tab name)
+addon.FindChatFrameByName = function(name)
+    for i = 1, NUM_CHAT_WINDOWS do
+        local frame = _G["ChatFrame" .. i]
+        local tab = _G["ChatFrame" .. i .. "Tab"]
+        if frame and tab then
+            local tabName = tab:GetText()
+            if tabName and tabName:lower() == name:lower() then
+                return frame, i
+            end
+        end
+    end
+    return nil
+end
+
+-- Get or create the dedicated QuietShuffle chat frame
+addon.GetDedicatedChatFrame = function()
+    if not addon.useDedicatedChatFrame then
+        return nil
+    end
+    -- Check if we have a cached valid frame
+    if addon.dedicatedChatFrame and addon.dedicatedChatFrame:IsShown() then
+        return addon.dedicatedChatFrame
+    end
+    -- Get the configured chat frame name from saved data
+    local chatFrameName = addon.savedData and addon.savedData.outputChatFrame
+    if not chatFrameName or chatFrameName == "" then
+        return nil
+    end
+    -- Try to find the configured tab
+    local frame = addon.FindChatFrameByName(chatFrameName)
+    if frame then
+        addon.dedicatedChatFrame = frame
+        return frame
+    end
+    return nil
+end
+
+-- Flag for using dedicated chat frame
+addon.useDedicatedChatFrame = false
+addon.dedicatedChatFrame = nil
+
 addon.Print = function(...)
     local parts = { ... }
     for i = 1, #parts do
         parts[i] = tostring(parts[i])
     end
-    local msg = table.concat(parts, " ")
-    print(addon.GetChatPrefix() .. " " .. msg)
+    local msg = addon.GetChatPrefix() .. " " .. table.concat(parts, " ")
+    
+    -- Try to use dedicated chat frame if enabled
+    local dedicatedFrame = addon.GetDedicatedChatFrame()
+    if dedicatedFrame then
+        dedicatedFrame:AddMessage(msg)
+    else
+        print(msg)
+    end
 end
 
 -- ============================================================================
@@ -40,6 +89,10 @@ addon.savedData = {
 
 addon.messages = {}
 addon.messageCounter = 0
+
+-- Track recently captured messages to avoid duplicates (keyed by hash)
+addon.recentMessages = {}
+addon.recentMessageExpiry = 2  -- seconds before a message hash expires
 
 -- Track whether we're currently in Solo Shuffle
 addon.inSoloShuffle = false
@@ -112,7 +165,6 @@ addon.CHAT_FILTER_EVENTS = {
     "CHAT_MSG_PARTY",
     "CHAT_MSG_PARTY_LEADER",
     "CHAT_MSG_PARTY_GUIDE",
-    "CHAT_MSG_PARTY_SAY",
     "CHAT_MSG_INSTANCE_CHAT",
     "CHAT_MSG_INSTANCE_CHAT_LEADER",
     "CHAT_MSG_BATTLEGROUND",
@@ -408,6 +460,3 @@ addon.CreateMinimapButton = function()
         addon.UpdateMinimapButtonPosition()
     end
 end
-
--- Initialization message
-addon.Print("v" .. addon.version .. ": Loaded! Type /qs for status.")
