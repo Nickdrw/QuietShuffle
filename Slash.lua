@@ -62,6 +62,7 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     end
 
     if command == "clear" then
+        addon.messages = addon.messages or {}
         wipe(addon.messages)
         addon.Print("Stored messages cleared.")
         return
