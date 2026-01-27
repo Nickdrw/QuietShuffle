@@ -57,61 +57,91 @@ local function ExtractChatLineInfo(...)
     return lineID, guid
 end
 
-local function NormalizeSenderName(name)
-    if not name or name == "" then
-        return name
-    end
-    local short = name:match("^([^%-]+)") or name
-    return short
-end
-
 -- Intercept and store chat messages
 addon.InterceptChatMessage = function(self, event, message, sender, ...)
-    local inSoloShuffleMatch = addon.IsSoloShuffleMatch and addon.IsSoloShuffleMatch() or false
-    if inSoloShuffleMatch and not addon.inSoloShuffle then
-        if addon.CheckSoloShuffleStatus then
-            addon.CheckSoloShuffleStatus()
+    -- Capture varargs before entering pcall
+    local extraArgs = {...}
+
+    -- Wrap in pcall to prevent errors from breaking the filter permanently
+    local ok, result = pcall(function()
+        -- Trust the current filtering state; detection is handled by events and the timer.
+        -- Do NOT call IsSoloShuffleMatch() here - it can return inconsistent values during
+        -- round transitions, causing messages to slip through.
+
+        if addon.debugFilters then
+            -- Color red if filtering won't happen (state is false)
+            if not addon.filteringEnabled or not addon.inSoloShuffle then
+                addon.Print("|cFFFF0000filter", event, "inSolo=", tostring(addon.inSoloShuffle), "enabled=", tostring(addon.filteringEnabled), "|r")
+            else
+                addon.Print("filter", event, "inSolo=", tostring(addon.inSoloShuffle), "enabled=", tostring(addon.filteringEnabled))
+            end
         end
-    elseif not inSoloShuffleMatch and addon.inSoloShuffle then
-        if addon.CheckSoloShuffleStatus then
-            addon.CheckSoloShuffleStatus()
+
+        if not addon.filteringEnabled or not addon.inSoloShuffle then
+            return false
         end
+
+        -- If the filter is firing, capture it (filtering is active)
+
+        local timestamp = time()
+
+        -- Deduplicate: build a hash key from event, sender, message
+        local msgHash = string.format("%s|%s|%s", event or "", sender or "", message or "")
+        addon.recentMessages = addon.recentMessages or {}
+        local now = GetTime()
+
+        -- Clean up expired hashes (collect keys first to avoid modifying during iteration)
+        local expiredKeys = {}
+        for k, v in pairs(addon.recentMessages) do
+            if now - v > (addon.recentMessageExpiry or 2) then
+                table.insert(expiredKeys, k)
+            end
+        end
+        for _, k in ipairs(expiredKeys) do
+            addon.recentMessages[k] = nil
+        end
+
+        -- Skip if we've already captured this exact message recently
+        if addon.recentMessages[msgHash] then
+            if addon.debugFilters then
+                addon.Print("dedupe skip", event, sender or "Unknown")
+            end
+            return true  -- still suppress display, but don't re-record
+        end
+        addon.recentMessages[msgHash] = now
+
+        local lineID, guid = ExtractChatLineInfo(unpack(extraArgs))
+
+        local classFile = addon.ResolveClassFromGUID(guid)
+
+        addon.messages = addon.messages or {}
+        addon.messageCounter = (addon.messageCounter or 0) + 1
+        table.insert(addon.messages, {
+            sender = sender,
+            channel = event,
+            message = message,
+            timestamp = timestamp,
+            lineID = lineID,
+            guid = guid,
+            class = classFile,
+            id = addon.messageCounter
+        })
+
+        if addon.debugFilters then
+            addon.Print("captured", event, sender or "Unknown", "-", message or "")
+        end
+
+        return true
+    end)
+
+    -- Handle pcall result
+    if not ok then
+        if addon.debugFilters then
+            addon.Print("|cFFFF0000filter error:", tostring(result), "|r")
+        end
+        return false  -- Don't suppress on error, let message through
     end
-
-    if addon.debugFilters then
-        addon.Print("filter", event, "inSolo=", tostring(addon.inSoloShuffle), "enabled=", tostring(addon.filteringEnabled))
-    end
-
-    if not addon.filteringEnabled or not addon.inSoloShuffle then
-        return false
-    end
-
-    -- If the filter is firing, capture it (filtering is active)
-
-    local timestamp = time()
-    local lineID, guid = ExtractChatLineInfo(...)
-
-    if event == "CHAT_MSG_WHISPER" or event == "CHAT_MSG_WHISPER_INFORM" then
-        -- Always capture and suppress classic whispers during Solo Shuffle.
-        -- Battle.net whispers use BN_WHISPER events and are not filtered.
-    end
-
-    local classFile = addon.ResolveClassFromGUID(guid)
-
-    addon.messages = addon.messages or {}
-    addon.messageCounter = (addon.messageCounter or 0) + 1
-    table.insert(addon.messages, {
-        sender = sender,
-        channel = event,
-        message = message,
-        timestamp = timestamp,
-        lineID = lineID,
-        guid = guid,
-        class = classFile,
-        id = addon.messageCounter
-    })
-
-    return true
+    return result
 end
 
 local function EnsureChatHandlerHook()
@@ -167,24 +197,42 @@ local function ShouldSuppressChatMessage(message)
     if type(message) ~= "string" then
         return false
     end
-    local channels = {
-        "PARTY",
-        "PARTY_LEADER",
-        "PARTY_GUIDE",
-        "INSTANCE_CHAT",
-        "INSTANCE_CHAT_LEADER",
-        "BATTLEGROUND",
-        "BATTLEGROUND_LEADER",
-        "ARENA",
-        "ARENA_LEADER",
-        "SAY",
-        "YELL",
-        "EMOTE",
-        "TEXT_EMOTE",
+    -- Check for various channel hyperlink formats
+    local channelPatterns = {
+        "|Hchannel:PARTY",
+        "|Hchannel:PARTY_LEADER",
+        "|Hchannel:PARTY_GUIDE",
+        "|Hchannel:INSTANCE_CHAT",
+        "|Hchannel:INSTANCE_CHAT_LEADER",
+        "|Hchannel:BATTLEGROUND",
+        "|Hchannel:BATTLEGROUND_LEADER",
+        "|Hchannel:ARENA",
+        "|Hchannel:ARENA_LEADER",
+        "|Hchannel:SAY",
+        "|Hchannel:YELL",
+        "|Hchannel:EMOTE",
+        "|Hchannel:TEXT_EMOTE",
+        -- Also catch generic channel format used for /say /yell in some locales
+        "|Hchannel:channel:0",
+    }
+    -- Chat type prefixes that appear in formatted messages (localized)
+    local chatTypePrefixes = {
+        "%[Party%]",
+        "%[Party Leader%]",
+        "%[Instance%]",
+        "%[Battleground%]",
+        "%[Arena%]",
     }
     local ok, suppressed = pcall(function()
-        for _, ch in ipairs(channels) do
-            if string.find(message, "|Hchannel:" .. ch, 1, true) then
+        -- Check channel hyperlinks
+        for _, pattern in ipairs(channelPatterns) do
+            if string.find(message, pattern, 1, true) then
+                return true
+            end
+        end
+        -- Check chat type prefixes
+        for _, pattern in ipairs(chatTypePrefixes) do
+            if string.find(message, pattern) then
                 return true
             end
         end
@@ -228,9 +276,7 @@ addon.EnableMessageFiltering = function()
         addon.Print("enabling filters")
     end
     addon.FilterEventLookup = addon.FilterEventLookup or {}
-    for k in pairs(addon.FilterEventLookup) do
-        addon.FilterEventLookup[k] = nil
-    end
+    wipe(addon.FilterEventLookup)
     for _, event in ipairs(addon.CHAT_FILTER_EVENTS) do
         addon.FilterEventLookup[event] = true
     end

@@ -139,9 +139,9 @@ end
 
 -- Build list of current Solo Shuffle match players
 addon.RefreshMatchPlayers = function()
-    addon.matchPlayers = {}
-    addon.matchPlayersFull = {}
-    addon.matchPlayerGuids = {}
+    wipe(addon.matchPlayers)
+    wipe(addon.matchPlayersFull)
+    wipe(addon.matchPlayerGuids)
 
     local groupType = 0
     if IsInRaid and IsInRaid() then
@@ -212,9 +212,9 @@ addon.CheckSoloShuffleStatus = function()
             end
             addon.SetActiveCharacter(currentKey)
             DisableChatBubbles()
-            addon.matchPlayers = {}
-            addon.matchPlayersFull = {}
-            addon.matchPlayerGuids = {}
+            wipe(addon.matchPlayers)
+            wipe(addon.matchPlayersFull)
+            wipe(addon.matchPlayerGuids)
             addon.RefreshMatchPlayers()
             addon.Print("Solo Shuffle started! Muting communications from match players.")
             if addon.debugFilters then
@@ -227,9 +227,9 @@ addon.CheckSoloShuffleStatus = function()
         end
     elseif not inSoloShuffleMatch and (addon.inSoloShuffle or addon.filteringEnabled) then
         addon.inSoloShuffle = false
-        addon.matchPlayers = {}
-        addon.matchPlayersFull = {}
-        addon.matchPlayerGuids = {}
+        wipe(addon.matchPlayers)
+        wipe(addon.matchPlayersFull)
+        wipe(addon.matchPlayerGuids)
         if addon.DisableMessageFiltering then
             addon.DisableMessageFiltering()
         end
@@ -255,18 +255,61 @@ addon.CheckSoloShuffleStatus = function()
             sessionEntry.message_count = sessionEntry.message_count + 1
         end
 
+        if addon.debugFilters then
+            local counts = {}
+            local labelMap = {
+                CHAT_MSG_SAY = "/say",
+                CHAT_MSG_YELL = "/yell",
+                CHAT_MSG_PARTY = "/party",
+                CHAT_MSG_PARTY_LEADER = "/party",
+                CHAT_MSG_PARTY_GUIDE = "/party",
+                CHAT_MSG_INSTANCE_CHAT = "/instance",
+                CHAT_MSG_INSTANCE_CHAT_LEADER = "/instance",
+                CHAT_MSG_BATTLEGROUND = "/battleground",
+                CHAT_MSG_BATTLEGROUND_LEADER = "/battleground",
+                CHAT_MSG_ARENA = "/arena",
+                CHAT_MSG_ARENA_LEADER = "/arena",
+                CHAT_MSG_WHISPER = "whisper",
+                CHAT_MSG_WHISPER_INFORM = "whisper",
+                CHAT_MSG_EMOTE = "emote",
+                CHAT_MSG_TEXT_EMOTE = "text emote",
+            }
+            for _, msgData in ipairs(addon.messages) do
+                local label = labelMap[msgData.channel] or msgData.channel or "Unknown"
+                counts[label] = (counts[label] or 0) + 1
+            end
+
+            addon.Print("Summary (captured):", tostring(#addon.messages))
+            local order = {
+                "/say",
+                "/yell",
+                "/party",
+                "/instance",
+                "/battleground",
+                "/arena",
+                "whisper",
+                "emote",
+                "text emote",
+            }
+            for _, label in ipairs(order) do
+                if counts[label] then
+                    addon.Print(label .. ":", tostring(counts[label]))
+                    counts[label] = nil
+                end
+            end
+            for label, count in pairs(counts) do
+                addon.Print(tostring(label) .. ":", tostring(count))
+            end
+        end
+
         local history = addon.EnsureCharacterHistory(addon.GetCharacterKey())
         table.insert(history, sessionEntry)
 
         if addon.PrintStoredMessages then
-            if C_Timer and C_Timer.After then
-                C_Timer.After(2, addon.PrintStoredMessages)
-            else
-                addon.PrintStoredMessages()
-            end
+            addon.PrintStoredMessages()
         end
 
-        addon.messages = {}
+        wipe(addon.messages)
         addon.messageCounter = 0
     else
         if addon.chatBubbleState then
@@ -312,6 +355,11 @@ frame:SetScript("OnEvent", function(self, event)
             addon.SetCharacterClass(currentKey, classFile)
         end
         addon.SetActiveCharacter(currentKey)
+
+        -- Load saved chat frame preference
+        if addon.savedData.outputChatFrame and addon.savedData.outputChatFrame ~= "" then
+            addon.useDedicatedChatFrame = true
+        end
 
         if addon.RegisterMinimapIcon and addon.RegisterMinimapIcon() then
             -- LibDBIcon handled

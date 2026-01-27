@@ -4,9 +4,6 @@
 
 local _, addon = ...
 
-SLASH_QUIETSHUFFLE1 = "/qs"
-SLASH_QUIETSHUFFLE2 = "/quietshuffle"
-
 SlashCmdList["QUIETSHUFFLE"] = function(msg)
     local command, arg = msg:match("^(%S+)%s*(.*)")
 
@@ -16,6 +13,16 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     end
 
     if not command or command == "" then
+        addon.Print("List of available commands")
+        addon.Print("/qs status - Show status")
+        addon.Print("/qs history - Show message history window")
+        addon.Print("/qs clear - Clear current messages")
+        addon.Print("/qs chatframe - Toggle dedicated chat tab output")
+        addon.Print("/qs debug on|off - Toggle debug output")
+        return
+    end
+
+    if command == "status" then
         if addon.CheckSoloShuffleStatus then
             addon.CheckSoloShuffleStatus()
         end
@@ -55,7 +62,7 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     end
 
     if command == "clear" then
-        addon.messages = {}
+        wipe(addon.messages)
         addon.Print("Stored messages cleared.")
         return
     end
@@ -67,17 +74,44 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         return
     end
 
-    if command == "debug" and (arg == "on" or arg == "off") then
-        addon.debugFilters = (arg == "on")
+    if command == "chatframe" then
+        -- Toggle or set chat frame. Usage: /qs chatframe [name]
+        addon.savedData = addon.savedData or {}
+        if arg and arg ~= "" then
+            -- Set specific chat frame
+            addon.savedData.outputChatFrame = arg
+            addon.useDedicatedChatFrame = true
+            addon.dedicatedChatFrame = nil
+            local frame = addon.FindChatFrameByName(arg)
+            if frame then
+                addon.Print("Using '" .. arg .. "' chat tab for output.")
+            else
+                addon.Print("Chat tab '" .. arg .. "' not found. Create it or check spelling.")
+            end
+        else
+            -- Toggle off
+            addon.savedData.outputChatFrame = nil
+            addon.useDedicatedChatFrame = false
+            addon.dedicatedChatFrame = nil
+            addon.Print("Using default chat frame for output.")
+            addon.Print("Use /qs chatframe <name> to set a specific tab, or configure in Settings.")
+        end
+        return
+    end
+
+    if command == "debug" then
+        if arg == "on" or arg == "off" then
+            addon.debugFilters = (arg == "on")
+        end
         addon.Print("Debug " .. (addon.debugFilters and "enabled" or "disabled") .. ".")
         return
     end
 
     addon.Print("Unknown command.")
-    addon.Print("/qs - Show status")
+    addon.Print("List of available commands")
+    addon.Print("/qs status - Show status")
     addon.Print("/qs history - Show message history window")
-    addon.Print("/qs test start - Simulate Solo Shuffle start")
-    addon.Print("/qs test stop - Simulate Solo Shuffle end")
     addon.Print("/qs clear - Clear current messages")
-    addon.Print("/qs debug on|off - Toggle filter debug")
+    addon.Print("/qs chatframe - Toggle dedicated chat tab output")
+    addon.Print("/qs debug on|off - Toggle debug output")
 end

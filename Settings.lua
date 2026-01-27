@@ -105,6 +105,63 @@ local function CreateSettingsPanel()
         end
     end)
 
+    -- Chat frame output settings
+    local chatFrameLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    chatFrameLabel:SetPoint("TOPLEFT", minimapCheckbox, "BOTTOMLEFT", 0, -16)
+    chatFrameLabel:SetText("Output Chat Tab Name:")
+
+    local chatFrameInput = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+    chatFrameInput:SetPoint("TOPLEFT", chatFrameLabel, "BOTTOMLEFT", 6, -4)
+    chatFrameInput:SetSize(150, 22)
+    chatFrameInput:SetAutoFocus(false)
+    chatFrameInput:SetScript("OnEnterPressed", function(self)
+        local text = self:GetText():trim()
+        addon.savedData = addon.savedData or {}
+        if text == "" then
+            addon.savedData.outputChatFrame = nil
+            addon.useDedicatedChatFrame = false
+            addon.dedicatedChatFrame = nil
+            addon.Print("Using default chat frame for output.")
+        else
+            addon.savedData.outputChatFrame = text
+            addon.useDedicatedChatFrame = true
+            addon.dedicatedChatFrame = nil  -- Force re-lookup
+            local frame = addon.FindChatFrameByName(text)
+            if frame then
+                addon.Print("Using '" .. text .. "' chat tab for output.")
+            else
+                addon.Print("Chat tab '" .. text .. "' not found. Create it or check spelling.")
+            end
+        end
+        self:ClearFocus()
+    end)
+    chatFrameInput:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+
+    local defaultButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    defaultButton:SetPoint("LEFT", chatFrameInput, "RIGHT", 8, 0)
+    defaultButton:SetSize(70, 22)
+    defaultButton:SetText("Default")
+    defaultButton:SetScript("OnClick", function()
+        chatFrameInput:SetText("General")
+        chatFrameInput:GetScript("OnEnterPressed")(chatFrameInput)
+    end)
+
+    local clearChatFrameButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    clearChatFrameButton:SetPoint("LEFT", defaultButton, "RIGHT", 4, 0)
+    clearChatFrameButton:SetSize(60, 22)
+    clearChatFrameButton:SetText("Clear")
+    clearChatFrameButton:SetScript("OnClick", function()
+        chatFrameInput:SetText("")
+        chatFrameInput:GetScript("OnEnterPressed")(chatFrameInput)
+    end)
+
+    local chatFrameHint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    chatFrameHint:SetPoint("TOPLEFT", chatFrameInput, "BOTTOMLEFT", -6, -4)
+    chatFrameHint:SetText("Leave empty for default chat. Press Enter to apply.")
+    chatFrameHint:SetTextColor(0.6, 0.6, 0.6)
+
     panel:HookScript("OnShow", function()
         if addon.IsEnabled then
             enableCheckbox:SetChecked(addon.IsEnabled())
@@ -113,6 +170,9 @@ local function CreateSettingsPanel()
         end
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
         minimapCheckbox:SetChecked(not QuietShuffleLDBIconDB.hide)
+        -- Load saved chat frame name
+        addon.savedData = addon.savedData or {}
+        chatFrameInput:SetText(addon.savedData.outputChatFrame or "")
     end)
 
     return panel
