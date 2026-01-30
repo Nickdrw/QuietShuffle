@@ -306,6 +306,9 @@ addon.chatBubbleState = nil
 addon.activeCharacterKey = nil
 addon.activeHistory = nil
 
+-- Maximum sessions to keep per character (prevent SavedVariables bloat)
+addon.MAX_SESSIONS_PER_CHARACTER = 100
+
 -- Track players in the current Solo Shuffle match
 addon.matchPlayers = {}
 
@@ -355,6 +358,18 @@ addon.EnsureCharacterHistory = function(key)
         addon.savedData.characters[key] = { history = {} }
     end
     return addon.savedData.characters[key].history
+end
+
+-- Clean up old sessions to prevent SavedVariables bloat
+addon.CleanupOldSessions = function(key)
+    local history = addon.EnsureCharacterHistory(key)
+    if #history > addon.MAX_SESSIONS_PER_CHARACTER then
+        -- Remove oldest sessions, keeping only the most recent MAX_SESSIONS_PER_CHARACTER
+        local toRemove = #history - addon.MAX_SESSIONS_PER_CHARACTER
+        for i = 1, toRemove do
+            table.remove(history, 1)  -- Remove from front (oldest)
+        end
+    end
 end
 
 addon.SetCharacterClass = function(key, classFile)
