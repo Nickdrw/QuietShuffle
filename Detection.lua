@@ -487,6 +487,11 @@ addon.CheckSoloShuffleStatus = function()
         local history = addon.EnsureCharacterHistory(addon.GetCharacterKey())
         table.insert(history, sessionEntry)
         
+        -- Clean up old sessions to prevent SavedVariables bloat
+        if addon.CleanupOldSessions then
+            addon.CleanupOldSessions(addon.GetCharacterKey())
+        end
+        
         -- Clear the active session since match ended normally
         addon.ClearActiveSession()
 

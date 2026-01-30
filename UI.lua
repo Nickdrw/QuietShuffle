@@ -88,6 +88,10 @@ local function GetOrCreateMessageRow(index)
         end
     end)
 
+    row.highlightBg = row:CreateTexture(nil, "BACKGROUND")
+    row.highlightBg:SetColorTexture(1, 1, 0, 0.15)
+    row.highlightBg:Hide()
+
     row:SetScript("OnSizeChanged", function(self, width)
         if self.text then
             self.text:SetWidth(width)
@@ -332,7 +336,20 @@ addon.ShowSessionMessages = function(sessionIndex)
         row:SetWidth(addon.historyMessageContentFrame:GetWidth())
         local rowHeight = 24
         if msgData then
+            local searchFilter = addon.searchFilter or nil
             local parts = FormatChatMessageParts(msgData)
+            
+            -- Check if this row matches the search
+            local isMatch = false
+            if searchFilter and searchFilter ~= "" then
+                local lowerSearch = searchFilter:lower()
+                local sender = msgData.sender or ""
+                local message = msgData.message or ""
+                if sender:lower():find(lowerSearch, 1, true) or message:lower():find(lowerSearch, 1, true) then
+                    isMatch = true
+                end
+            end
+            
             row.text:Hide()
             row.prefixText:Show()
             row.nameText:Show()
@@ -377,11 +394,21 @@ addon.ShowSessionMessages = function(sessionIndex)
             local textHeight = row.messageText:GetStringHeight() or 0
             rowHeight = math.max(24, textHeight + 6)
             row:SetHeight(rowHeight)
+            
+            -- Size and position highlight to cover full row width but only text line height
+            if isMatch then
+                row.highlightBg:Show()
+                row.highlightBg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+                row.highlightBg:SetSize(row:GetWidth(), textHeight + 4)
+            else
+                row.highlightBg:Hide()
+            end
         else
             row.prefixText:Hide()
             row.nameText:Hide()
             row.messageText:Hide()
             row.nameButton:Hide()
+            row.highlightBg:Hide()
             row.text:Show()
             row.text:SetText(text)
 
@@ -407,6 +434,9 @@ addon.ShowSessionMessages = function(sessionIndex)
     end
 
     if sessionIndex == 0 then
+        if addon.sessionInfoTitle then
+            addon.sessionInfoTitle:SetText("")
+        end
         if addon.inSoloShuffle then
             AddRow("History is hidden during Solo Shuffle.")
             FinalizeDisplay(nil)
@@ -422,6 +452,21 @@ addon.ShowSessionMessages = function(sessionIndex)
         return
     else
         local session = history[sessionIndex]
+        if session then
+            -- Update session info title
+            if addon.sessionInfoTitle then
+                local startTime = session.startTime or session.timestamp
+                local endTime = session.endTime or session.timestamp
+                local duration = endTime - startTime
+                local minutes = math.floor(duration / 60)
+                local seconds = duration % 60
+                local durationStr = string.format("%d:%02d", minutes, seconds)
+                local timeStr = date("%H:%M", startTime)
+                local zoneName = session.zone or "Unknown"
+                    local infoText = string.format("|cFFFFD700%s|r on |cFFCCCCCC%s|r, last |cFF88FF88%s|r", timeStr, zoneName, durationStr)
+                addon.sessionInfoTitle:SetText(infoText)
+            end
+        end
         if session and session.messages and #session.messages > 0 then
             for _, msgData in ipairs(session.messages) do
                 AddRow(nil, msgData)
@@ -506,8 +551,9 @@ addon.PopulateSessionList = function()
             local sessionLabel = string.format("%s %s-%s - %s (%d)", dateStr, startTimeStr, endTimeStr, zoneInitial, session.message_count)
 
             local button = CreateFrame("Button", nil, addon.historySessionContentFrame, "BackdropTemplate")
-            button:SetSize(220, 28)
-            button:SetPoint("TOPLEFT", addon.historySessionContentFrame, "TOPLEFT", 5, yOffset)
+            button:SetHeight(28)
+            button:SetPoint("TOPLEFT", addon.historySessionContentFrame, "TOPLEFT", 3, yOffset)
+            button:SetPoint("TOPRIGHT", addon.historySessionContentFrame, "TOPRIGHT", -3, yOffset)
 
         button:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -618,6 +664,7 @@ addon.CreateHistoryWindow = function()
     end)
     addon.searchBox = searchBox
 
+
     local sessionPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     sessionPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -65)
     sessionPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 260, 40)
@@ -636,7 +683,7 @@ addon.CreateHistoryWindow = function()
     sessionScrollFrame:SetPoint("BOTTOMRIGHT", sessionPanel, "BOTTOMRIGHT", -25, 5)
 
     local sessionContentFrame = CreateFrame("Frame", nil, sessionScrollFrame)
-    sessionContentFrame:SetWidth(210)
+    sessionContentFrame:SetWidth(215)
     sessionScrollFrame:SetScrollChild(sessionContentFrame)
 
     local characterDropdown = CreateFrame("Frame", "QuietShuffleCharacterDropdown", frame, "UIDropDownMenuTemplate")
