@@ -75,6 +75,158 @@ addon.Print = function(...)
 end
 
 -- ============================================================================
+-- HYPERLINK HANDLER - Handle clicks on addon custom links
+-- ============================================================================
+
+-- Open settings panel
+addon.OpenSettings = function()
+    if Settings and Settings.OpenToCategory and addon.settingsCategory then
+        Settings.OpenToCategory(addon.settingsCategory:GetID())
+    elseif InterfaceOptionsFrame_OpenToCategory then
+        InterfaceOptionsFrame_OpenToCategory(addon.name)
+        InterfaceOptionsFrame_OpenToCategory(addon.name)  -- Call twice for nested panels
+    end
+end
+
+-- Create support popup window (created on demand)
+addon.CreateSupportPopup = function()
+    if addon.supportPopup then
+        return addon.supportPopup
+    end
+
+    local popup = CreateFrame("Frame", "QuietShuffleSupportPopup", UIParent, "BackdropTemplate")
+    popup:SetSize(420, 180)
+    popup:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
+    popup:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    popup:SetFrameStrata("DIALOG")
+    popup:SetMovable(true)
+    popup:EnableMouse(true)
+    popup:RegisterForDrag("LeftButton")
+    popup:SetScript("OnDragStart", popup.StartMoving)
+    popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
+    popup:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then
+            self:SetPropagateKeyboardInput(false)
+            self:Hide()
+        else
+            self:SetPropagateKeyboardInput(true)
+        end
+    end)
+    popup:EnableKeyboard(true)
+    popup:Hide()
+
+    -- Title
+    local title = popup:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOP", popup, "TOP", 0, -20)
+    title:SetText("|cFF2FAEF7Quiet|r|cFF7B579CShuffle|r - Support")
+
+    -- Subtitle
+    local subtitle = popup:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    subtitle:SetPoint("TOP", title, "BOTTOM", 0, -8)
+    subtitle:SetText("Thank you for using QuietShuffle!")
+
+    -- Close button
+    local closeButton = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -4, -4)
+
+    -- URL display frame (for copying URLs)
+    local urlFrame = CreateFrame("Frame", nil, popup, "BackdropTemplate")
+    urlFrame:SetSize(380, 30)
+    urlFrame:SetPoint("BOTTOM", popup, "BOTTOM", 0, 40)
+    urlFrame:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    urlFrame:SetBackdropColor(0, 0, 0, 0.8)
+    urlFrame:Hide()
+
+    local urlEditBox = CreateFrame("EditBox", nil, urlFrame, "InputBoxTemplate")
+    urlEditBox:SetPoint("LEFT", urlFrame, "LEFT", 8, 0)
+    urlEditBox:SetPoint("RIGHT", urlFrame, "RIGHT", -8, 0)
+    urlEditBox:SetHeight(20)
+    urlEditBox:SetAutoFocus(false)
+    urlEditBox:SetScript("OnEscapePressed", function(self)
+        urlFrame:Hide()
+    end)
+    urlEditBox:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+    end)
+    popup.urlFrame = urlFrame
+    popup.urlEditBox = urlEditBox
+
+    local function ShowURL(url)
+        urlEditBox:SetText(url)
+        urlFrame:Show()
+        urlEditBox:SetFocus()
+        urlEditBox:HighlightText()
+    end
+
+    -- PayPal button (center the group of 3 buttons)
+    -- Total width: 120 + 8 + 140 + 8 + 120 = 396, so offset by -198 to center
+    local paypalButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+    paypalButton:SetPoint("TOP", subtitle, "BOTTOM", -138, -16)
+    paypalButton:SetSize(120, 26)
+    paypalButton:SetText("Buy me a coffee")
+    paypalButton:SetScript("OnClick", function()
+        ShowURL("https://paypal.me/NickDrw")
+    end)
+
+    -- Patreon button
+    local patreonButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+    patreonButton:SetPoint("LEFT", paypalButton, "RIGHT", 8, 0)
+    patreonButton:SetSize(140, 26)
+    patreonButton:SetText("Support on Patreon")
+    patreonButton:SetScript("OnClick", function()
+        ShowURL("https://patreon.com/NickDrew")
+    end)
+
+    -- Spread the Word button
+    local spreadButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+    spreadButton:SetPoint("LEFT", patreonButton, "RIGHT", 8, 0)
+    spreadButton:SetSize(120, 26)
+    spreadButton:SetText("Spread the word")
+    spreadButton:SetScript("OnClick", function()
+        ShowURL("https://www.curseforge.com/wow/addons/PLACEHOLDER")
+    end)
+
+    -- Hint text
+    local hint = popup:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    hint:SetPoint("BOTTOM", popup, "BOTTOM", 0, 16)
+    hint:SetText("Click a button, then Ctrl+C to copy the URL")
+    hint:SetTextColor(0.6, 0.6, 0.6)
+
+    addon.supportPopup = popup
+    return popup
+end
+
+-- Show support popup
+addon.ShowSupportPopup = function()
+    local popup = addon.CreateSupportPopup()
+    popup:Show()
+    popup:Raise()
+end
+
+-- Hook all chat frames for hyperlink handling
+local originalSetItemRef = SetItemRef
+SetItemRef = function(link, text, button, chatFrame)
+    local addonName, action = link:match("^addon:([^:]+):(.+)$")
+    if addonName == "QuietShuffle" then
+        if action == "settings" then
+            addon.ShowSupportPopup()
+        end
+        return
+    end
+    return originalSetItemRef(link, text, button, chatFrame)
+end
+
+-- ============================================================================
 -- SAVEDVARIABLES SETUP - Initialize persistent storage
 -- ============================================================================
 
