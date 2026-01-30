@@ -108,6 +108,23 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         return
     end
 
+    if command == "players" then
+        addon.Print("Match players tracked:")
+        if addon.matchPlayers then
+            local count = 0
+            for name, _ in pairs(addon.matchPlayers) do
+                addon.Print("  - " .. name)
+                count = count + 1
+            end
+            if count == 0 then
+                addon.Print("  (none)")
+            end
+        else
+            addon.Print("  (table not initialized)")
+        end
+        return
+    end
+
     addon.Print("Unknown command.")
     addon.Print("List of available commands")
     addon.Print("/qs status - Show status")

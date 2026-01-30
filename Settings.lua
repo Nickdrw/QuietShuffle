@@ -162,6 +162,107 @@ local function CreateSettingsPanel()
     chatFrameHint:SetText("Leave empty for default chat. Press Enter to apply.")
     chatFrameHint:SetTextColor(0.6, 0.6, 0.6)
 
+    -- Support section (anchored to bottom)
+    local supportLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    supportLabel:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 60)
+    supportLabel:SetText("Support the Developer")
+
+    -- URL display popup frame (shared between buttons)
+    local urlPopup = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+    urlPopup:SetSize(400, 80)
+    urlPopup:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    urlPopup:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 8, right = 8, top = 8, bottom = 8 }
+    })
+    urlPopup:SetFrameStrata("DIALOG")
+    urlPopup:EnableMouse(true)
+    urlPopup:Hide()
+
+    local urlPopupTitle = urlPopup:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    urlPopupTitle:SetPoint("TOP", urlPopup, "TOP", 0, -16)
+    urlPopupTitle:SetText("Copy this URL (Ctrl+C)")
+
+    local urlEditBox = CreateFrame("EditBox", nil, urlPopup, "InputBoxTemplate")
+    urlEditBox:SetPoint("TOP", urlPopupTitle, "BOTTOM", 0, -8)
+    urlEditBox:SetSize(360, 22)
+    urlEditBox:SetAutoFocus(false)
+    urlEditBox:SetScript("OnEscapePressed", function(self)
+        urlPopup:Hide()
+    end)
+    urlEditBox:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+    end)
+
+    local urlCloseButton = CreateFrame("Button", nil, urlPopup, "UIPanelButtonTemplate")
+    urlCloseButton:SetPoint("TOP", urlEditBox, "BOTTOM", 0, -8)
+    urlCloseButton:SetSize(80, 22)
+    urlCloseButton:SetText("Close")
+    urlCloseButton:SetScript("OnClick", function()
+        urlPopup:Hide()
+    end)
+
+    local function ShowURL(url, titleText)
+        urlPopupTitle:SetText(titleText or "Copy this URL (Ctrl+C)")
+        urlEditBox:SetText(url)
+        urlPopup:Show()
+        urlEditBox:SetFocus()
+        urlEditBox:HighlightText()
+    end
+
+    -- PayPal button
+    local paypalButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    paypalButton:SetPoint("TOPLEFT", supportLabel, "BOTTOMLEFT", 0, -8)
+    paypalButton:SetSize(160, 26)
+    paypalButton:SetText("Buy me a coffee")
+    paypalButton:SetScript("OnClick", function()
+        -- PayPal link
+        ShowURL("https://paypal.me/NickDrw", "PayPal - Buy me a coffee (Ctrl+C to copy)")
+    end)
+
+    -- Icon placeholder for PayPal (16x16 recommended)
+    local paypalIcon = paypalButton:CreateTexture(nil, "ARTWORK")
+    paypalIcon:SetSize(16, 16)
+    paypalIcon:SetPoint("LEFT", paypalButton, "LEFT", 8, 0)
+    -- paypalIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\paypal")  -- Uncomment when icon added
+    paypalButton.icon = paypalIcon
+
+    -- Patreon button
+    local patreonButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    patreonButton:SetPoint("LEFT", paypalButton, "RIGHT", 12, 0)
+    patreonButton:SetSize(180, 26)
+    patreonButton:SetText("Support me on Patreon")
+    patreonButton:SetScript("OnClick", function()
+        -- Patreon link
+        ShowURL("https://patreon.com/NickDrew", "Patreon - Support me (Ctrl+C to copy)")
+    end)
+
+    -- Icon placeholder for Patreon (16x16 recommended)
+    local patreonIcon = patreonButton:CreateTexture(nil, "ARTWORK")
+    patreonIcon:SetSize(16, 16)
+    patreonIcon:SetPoint("LEFT", patreonButton, "LEFT", 8, 0)
+    -- patreonIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\patreon")  -- Uncomment when icon added
+    patreonButton.icon = patreonIcon
+
+    -- Spread the Word button
+    local spreadButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    spreadButton:SetPoint("LEFT", patreonButton, "RIGHT", 12, 0)
+    spreadButton:SetSize(140, 26)
+    spreadButton:SetText("Spread the word")
+    spreadButton:SetScript("OnClick", function()
+        -- Placeholder URL - replace with actual CurseForge link
+        ShowURL("https://www.curseforge.com/wow/addons/PLACEHOLDER", "CurseForge - Share with friends! (Ctrl+C to copy)")
+    end)
+
+    -- Icon placeholder for CurseForge (16x16 recommended)
+    local spreadIcon = spreadButton:CreateTexture(nil, "ARTWORK")
+    spreadIcon:SetSize(16, 16)
+    spreadIcon:SetPoint("LEFT", spreadButton, "LEFT", 8, 0)
+    -- spreadIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\curseforge")  -- Uncomment when icon added
+    spreadButton.icon = spreadIcon
+
     panel:HookScript("OnShow", function()
         if addon.IsEnabled then
             enableCheckbox:SetChecked(addon.IsEnabled())

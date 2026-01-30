@@ -179,7 +179,7 @@ local function FormatChatMessageParts(msgData)
     return {
         prefix = string.format("|cFF%s%s|r |cFF%s%s|r ", channelHex, timeStr, channelHex, channelLabel),
         name = string.format("|cFF%s[%s]|r", classHex, sender),
-        message = message,
+        message = string.format("|cFF%s%s|r", channelHex, message),
         isEmote = false,
     }
 end
@@ -259,11 +259,24 @@ local function UpdateReportButtons(messageList)
     local players = {}
     local order = {}
     local selfName = UnitName("player")
+    local selfFullName = nil
+    if selfName then
+        local realm = GetRealmName()
+        if realm then
+            selfFullName = selfName .. "-" .. realm:gsub("%s+", "")
+        end
+    end
+    
     for _, msgData in ipairs(messageList) do
         local sender = msgData.sender
-        if sender and sender ~= "" and sender ~= selfName and not players[sender] then
-            players[sender] = { name = sender, guid = msgData.guid, lineID = msgData.lineID }
-            table.insert(order, sender)
+        if sender and sender ~= "" and not players[sender] then
+            -- Skip if this is the player themselves (check short name and full name)
+            local senderShort = sender:match("^([^-]+)") or sender
+            local isSelf = (senderShort == selfName) or (sender == selfFullName)
+            if not isSelf then
+                players[sender] = { name = sender, guid = msgData.guid, lineID = msgData.lineID }
+                table.insert(order, sender)
+            end
         end
     end
 
@@ -380,18 +393,33 @@ addon.ShowSessionMessages = function(sessionIndex)
         yOffset = yOffset + rowHeight + 2
     end
 
+    local function FinalizeDisplay(messages)
+        for i = rowIndex + 1, #addon.messageRows do
+            if addon.messageRows[i] then
+                addon.messageRows[i]:Hide()
+                addon.messageRows[i].msgData = nil
+            end
+        end
+
+        addon.historyMessageContentFrame:SetHeight(math.max(400, yOffset))
+        addon.lastReportMessages = messages
+        UpdateReportButtons(messages)
+    end
+
     if sessionIndex == 0 then
         if addon.inSoloShuffle then
             AddRow("History is hidden during Solo Shuffle.")
-            UpdateReportButtons(nil)
+            FinalizeDisplay(nil)
             return
         end
         if not addon.inSoloShuffle and history and #history > 0 then
             AddRow("Select a session to view its messages.")
-            UpdateReportButtons(nil)
+            FinalizeDisplay(nil)
             return
         end
         AddRow("No message for this character.")
+        FinalizeDisplay(nil)
+        return
     else
         local session = history[sessionIndex]
         if session and session.messages and #session.messages > 0 then
@@ -403,17 +431,7 @@ addon.ShowSessionMessages = function(sessionIndex)
             AddRow("No message in this session.")
         end
     end
-
-    for i = rowIndex + 1, #addon.messageRows do
-        if addon.messageRows[i] then
-            addon.messageRows[i]:Hide()
-            addon.messageRows[i].msgData = nil
-        end
-    end
-
-    addon.historyMessageContentFrame:SetHeight(math.max(400, yOffset))
-    addon.lastReportMessages = reportMessages
-    UpdateReportButtons(reportMessages)
+    FinalizeDisplay(reportMessages)
 end
 
 local function FormatMessageCount(count)
@@ -433,33 +451,63 @@ addon.PopulateSessionList = function()
     local yOffset = 0
     local sessionCount = 0
     local messageCount = 0
+    local searchFilter = addon.searchFilter and addon.searchFilter:lower() or nil
+    local selectedSessionVisible = false
+
+    -- Helper to check if session matches search filter
+    local function SessionMatchesSearch(session)
+        if not searchFilter or searchFilter == "" then
+            return true
+        end
+        if session.messages then
+            for _, msg in ipairs(session.messages) do
+                if msg.message and msg.message:lower():find(searchFilter, 1, true) then
+                    return true
+                end
+                if msg.sender and msg.sender:lower():find(searchFilter, 1, true) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
 
     -- Do not expose current-session messages during a match.
 
     local history = addon.GetActiveHistory()
     for i = #history, 1, -1 do
-        sessionCount = sessionCount + 1
         local session = history[i]
         local sessionIndex = i
 
-        local startTime = session.startTime or session.timestamp
-        local endTime = session.endTime or session.timestamp
-        local dateStr = date("%d/%m/%y", startTime)
-        local startTimeStr = date("%H:%M", startTime)
-        local endTimeStr = date("%H:%M", endTime)
-        local zoneName = session.zone or "Unknown"
-        local zoneInitial = ""
-        for word in zoneName:gmatch("%S+") do
-            zoneInitial = zoneInitial .. word:sub(1, 1)
-        end
-        if zoneInitial == "" then
-            zoneInitial = "?"
-        end
-        local sessionLabel = string.format("%s %s-%s - %s (%d)", dateStr, startTimeStr, endTimeStr, zoneInitial, session.message_count)
+        -- Skip sessions that don't match search filter
+        if not SessionMatchesSearch(session) then
+            -- continue to next iteration
+        else
+            sessionCount = sessionCount + 1
+            
+            -- Track if the currently selected session is visible
+            if addon.selectedSessionIndex == sessionIndex then
+                selectedSessionVisible = true
+            end
 
-        local button = CreateFrame("Button", nil, addon.historySessionContentFrame, "BackdropTemplate")
-        button:SetSize(220, 28)
-        button:SetPoint("TOPLEFT", addon.historySessionContentFrame, "TOPLEFT", 5, yOffset)
+            local startTime = session.startTime or session.timestamp
+            local endTime = session.endTime or session.timestamp
+            local dateStr = date("%d/%m/%y", startTime)
+            local startTimeStr = date("%H:%M", startTime)
+            local endTimeStr = date("%H:%M", endTime)
+            local zoneName = session.zone or "Unknown"
+            local zoneInitial = ""
+            for word in zoneName:gmatch("%S+") do
+                zoneInitial = zoneInitial .. word:sub(1, 1)
+            end
+            if zoneInitial == "" then
+                zoneInitial = "?"
+            end
+            local sessionLabel = string.format("%s %s-%s - %s (%d)", dateStr, startTimeStr, endTimeStr, zoneInitial, session.message_count)
+
+            local button = CreateFrame("Button", nil, addon.historySessionContentFrame, "BackdropTemplate")
+            button:SetSize(220, 28)
+            button:SetPoint("TOPLEFT", addon.historySessionContentFrame, "TOPLEFT", 5, yOffset)
 
         button:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -513,6 +561,16 @@ addon.PopulateSessionList = function()
 
         table.insert(addon.sessionButtons, button)
         yOffset = yOffset - 32
+        end  -- end of SessionMatchesSearch else block
+    end
+    
+    -- If search hides the selected session (or no sessions match), clear selection and refresh messages
+    if (not selectedSessionVisible and addon.selectedSessionIndex and addon.selectedSessionIndex > 0)
+        or (searchFilter and searchFilter ~= "" and sessionCount == 0) then
+        addon.selectedSessionIndex = 0
+        if addon.ShowSessionMessages then
+            addon.ShowSessionMessages(0)
+        end
     end
 
     addon.historySessionContentFrame:SetHeight(math.max(30, sessionCount * 32))
@@ -542,8 +600,26 @@ addon.CreateHistoryWindow = function()
     title:SetPoint("TOP", frame, "TOP", 0, -5)
     title:SetText("|cFFFFD700QuietShuffle|r |cFFCCCCCC- Solo Shuffle History|r")
 
+    -- Search box (top right, below title)
+    local searchBox = CreateFrame("EditBox", "QuietShuffleSearchBox", frame, "SearchBoxTemplate")
+    searchBox:SetSize(180, 22)
+    searchBox:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -35, -35)
+    searchBox:SetAutoFocus(false)
+    searchBox:SetScript("OnTextChanged", function(self)
+        SearchBoxTemplate_OnTextChanged(self)
+        addon.searchFilter = self:GetText():lower()
+        addon.PopulateSessionList()
+    end)
+    searchBox:SetScript("OnEscapePressed", function(self)
+        self:SetText("")
+        self:ClearFocus()
+        addon.searchFilter = nil
+        addon.PopulateSessionList()
+    end)
+    addon.searchBox = searchBox
+
     local sessionPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    sessionPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -60)
+    sessionPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -65)
     sessionPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 260, 40)
     sessionPanel:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -563,12 +639,8 @@ addon.CreateHistoryWindow = function()
     sessionContentFrame:SetWidth(210)
     sessionScrollFrame:SetScrollChild(sessionContentFrame)
 
-    local listLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    listLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 15, -38)
-    listLabel:SetText("|cFFFFD700Sessions|r")
-
     local characterDropdown = CreateFrame("Frame", "QuietShuffleCharacterDropdown", frame, "UIDropDownMenuTemplate")
-    characterDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", -5, -10)
+    characterDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", -5, -35)
     UIDropDownMenu_SetWidth(characterDropdown, 210)
     UIDropDownMenu_JustifyText(characterDropdown, "LEFT")
 
@@ -601,11 +673,6 @@ addon.CreateHistoryWindow = function()
         messageBg:SetPoint("CENTER", messagePanel, "CENTER", 0, 0)
         messagePanel.bgImage = messageBg
     end
-
-
-    local msgLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    msgLabel:SetPoint("TOPLEFT", messagePanel, "TOPLEFT", 5, 22)
-    msgLabel:SetText("|cFFFFD700Messages|r")
 
     local messageScrollFrame = CreateFrame("ScrollFrame", "QuietShuffleMessageScroll", messagePanel, "UIPanelScrollFrameTemplate")
     messageScrollFrame:SetPoint("TOPLEFT", messagePanel, "TOPLEFT", 5, -5)
