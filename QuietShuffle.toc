@@ -4,6 +4,8 @@
 ## Author: NickDrew
 ## Version: 0.1.0
 ## SavedVariables: QuietShuffleSavedData, QuietShuffleLDBIconDB
+## X-Curse-Project-ID: 1449682
+## X-Wago-ID: ZKxZEqNk
 
 Libs/LibStub/LibStub.lua
 Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua

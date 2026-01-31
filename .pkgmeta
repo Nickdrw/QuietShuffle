@@ -1,0 +1,7 @@
+package-as: QuietShuffle
+
+ignore:
+  - .github
+  - media/*.psd
+  - README.md
+  - LICENSE
