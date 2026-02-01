@@ -424,6 +424,9 @@ addon.CheckSoloShuffleStatus = function()
             return
         end
         
+        -- Only save a session if we were actually in Solo Shuffle (not just filtering enabled)
+        local wasInSoloShuffle = addon.inSoloShuffle
+        
         addon.inSoloShuffle = false
         addon.matchPlayers = addon.matchPlayers or {}
         addon.matchPlayersFull = addon.matchPlayersFull or {}
@@ -439,13 +442,27 @@ addon.CheckSoloShuffleStatus = function()
             addon.UnmuteRoundChat()
         end
         RestoreChatBubbles()
+        
+        -- Only save session if we were actually in a match (not just filtering pre-enabled)
+        if not wasInSoloShuffle then
+            return
+        end
+        
+        -- Only save if we have a valid session start time
+        if not addon.sessionStartTime then
+            addon.Print("Solo Shuffle detection ended (no session started).")
+            addon.ClearActiveSession()
+            return
+        end
 
         local zoneName = GetRealZoneText() or "Unknown"
         local endTime = time()
-        -- Ensure sessionStartTime is valid; if nil or invalid, treat as full session to avoid false "too brief"
         local startTime = addon.sessionStartTime
-        if not startTime or startTime > endTime then
-            startTime = endTime - 31  -- Assume at least 31 seconds passed if time is invalid
+        -- Sanity check: startTime should never be after endTime
+        if startTime and startTime > endTime then
+            addon.Print("Solo Shuffle detection ended (invalid timestamps).")
+            addon.ClearActiveSession()
+            return
         end
         local sessionDuration = endTime - startTime
         
