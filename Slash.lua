@@ -38,7 +38,7 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         else
             addon.Print("|cFFFF0000QuietShuffle disabled|r")
         end
-        addon.Print("List of available commands")
+        addon.Print("Available commands:")
         addon.Print("/qs enable - Enable the addon")
         addon.Print("/qs disable - Disable the addon")
         addon.Print("/qs settings - Open settings panel")
@@ -69,6 +69,26 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         return
     end
 
+    -- Test mode command (hidden from help, for development)
+    if command == "test" then
+        if arg == "start" then
+            addon.isTestMode = true
+            addon.Print("|cFFFFCC00Test mode started.|r Simulating Solo Shuffle.")
+            if addon.CheckSoloShuffleStatus then
+                addon.CheckSoloShuffleStatus()
+            end
+        elseif arg == "stop" then
+            addon.isTestMode = false
+            addon.Print("|cFFFFCC00Test mode stopped.|r")
+            if addon.CheckSoloShuffleStatus then
+                addon.CheckSoloShuffleStatus()
+            end
+        else
+            addon.Print("Usage: /qs test start | /qs test stop")
+        end
+        return
+    end
+
     if command == "players" then
         addon.Print("Match players tracked:")
         if addon.matchPlayers then
@@ -94,8 +114,9 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     else
         addon.Print("|cFFFF0000QuietShuffle disabled|r")
     end
-    addon.Print("List of available commands")
+    addon.Print("Available commands:")
     addon.Print("/qs enable - Enable the addon")
     addon.Print("/qs disable - Disable the addon")
+    addon.Print("/qs settings - Open settings panel")
     addon.Print("/qs history - Show message history window")
 end

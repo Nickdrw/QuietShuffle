@@ -17,11 +17,12 @@ addon.GetChatPrefix = function()
 end
 
 -- Find a chat frame by name (tab name)
+-- Only returns frames with visible/active tabs
 addon.FindChatFrameByName = function(name)
     for i = 1, NUM_CHAT_WINDOWS do
         local frame = _G["ChatFrame" .. i]
         local tab = _G["ChatFrame" .. i .. "Tab"]
-        if frame and tab then
+        if frame and tab and tab:IsShown() then
             local tabName = tab:GetText()
             if tabName and tabName:lower() == name:lower() then
                 return frame, i
@@ -46,32 +47,60 @@ addon.CreateChatTab = function(name)
     return addon.FindChatFrameByName(name)
 end
 
--- Get or create the dedicated QuietShuffle chat frame
+-- Get the dedicated chat frame for addon output.
+-- This function returns the frame or nil, falling back gracefully.
+-- If the configured tab no longer exists, it resets settings and returns nil.
 addon.GetDedicatedChatFrame = function()
     if not addon.useDedicatedChatFrame then
         return nil
     end
-    -- Get the configured chat frame name from saved data
     local chatFrameName = addon.savedData and addon.savedData.outputChatFrame
     if not chatFrameName or chatFrameName == "" then
         return nil
     end
-    -- Try to find the configured tab
+    -- Always verify the tab exists by searching for it (don't trust cache)
     local frame = addon.FindChatFrameByName(chatFrameName)
     if frame then
         addon.dedicatedChatFrame = frame
         return frame
     end
-    -- Tab doesn't exist - reset to General tab
+    -- Tab not found - reset settings and return nil for fallback
     addon.savedData.outputChatFrame = nil
     addon.useDedicatedChatFrame = false
     addon.dedicatedChatFrame = nil
-    -- Update settings panel if it's open
-    if addon.RefreshChatFrameDropdown then
-        addon.RefreshChatFrameDropdown()
-    end
-    addon.Print("Chat tab '" .. chatFrameName .. "' not found. Reverting to General tab.")
     return nil
+end
+
+-- Validate chat frame selection and reset if invalid.
+-- This is called on login and when settings panel opens.
+-- MUST NOT be called from Print or GetDedicatedChatFrame to avoid recursion.
+addon.ValidateChatFrameSelection = function()
+    if not addon.useDedicatedChatFrame then
+        return true
+    end
+    local chatFrameName = addon.savedData and addon.savedData.outputChatFrame
+    if not chatFrameName or chatFrameName == "" then
+        addon.useDedicatedChatFrame = false
+        return true
+    end
+    local frame = addon.FindChatFrameByName(chatFrameName)
+    if frame then
+        addon.dedicatedChatFrame = frame
+        return true
+    end
+    -- Tab doesn't exist - reset to General
+    local oldName = chatFrameName
+    addon.savedData.outputChatFrame = nil
+    addon.useDedicatedChatFrame = false
+    addon.dedicatedChatFrame = nil
+    -- Schedule notification for next frame to avoid recursion
+    C_Timer.After(0, function()
+        if addon.RefreshChatFrameDropdown then
+            addon.RefreshChatFrameDropdown()
+        end
+        DEFAULT_CHAT_FRAME:AddMessage(addon.GetChatPrefix() .. " Chat tab '" .. oldName .. "' not found. Using General tab.")
+    end)
+    return false
 end
 
 -- Flag for using dedicated chat frame
@@ -85,12 +114,11 @@ addon.Print = function(...)
     end
     local msg = addon.GetChatPrefix() .. " " .. table.concat(parts, " ")
     
-    -- Try to use dedicated chat frame if enabled
-    local dedicatedFrame = addon.GetDedicatedChatFrame()
-    if dedicatedFrame and dedicatedFrame:IsShown() then
-        dedicatedFrame:AddMessage(msg)
+    -- Get dedicated frame (side-effect free, may return nil)
+    local frame = addon.GetDedicatedChatFrame()
+    if frame then
+        frame:AddMessage(msg)
     else
-        -- Fall back to default chat (usually General)
         DEFAULT_CHAT_FRAME:AddMessage(msg)
     end
 end

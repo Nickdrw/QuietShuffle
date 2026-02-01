@@ -189,7 +189,7 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
         local stored = StoreOutgoingMessage(event, message, sender, lineID)
         if stored then
             addon.SaveActiveSession()
-            addon.Print("|cFFFFAAAA⚠ You whispered a lobby player.|r Stay quiet, stay focused!")
+            addon.Print("|cFFFFAAAAYou whispered a lobby player.|r Stay quiet, stay focused!")
         end
         return true  -- hide from chat
     end
@@ -200,7 +200,7 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
             local stored = StoreOutgoingMessage(event, message, nil, lineID)
             if stored then
                 addon.SaveActiveSession()
-                addon.Print("|cFFFFAAAA⚠ You sent a message.|r Stay quiet, stay focused!")
+                addon.Print("|cFFFFAAAAYou sent a message.|r Stay quiet, stay focused!")
             end
             return true  -- hide from chat
         end
@@ -213,7 +213,7 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
             local stored = StoreOutgoingMessage(event, message, nil, lineID)
             if stored then
                 addon.SaveActiveSession()
-                addon.Print("|cFFFFAAAA⚠ You sent a party message.|r Stay quiet, stay focused!")
+                addon.Print("|cFFFFAAAAYou sent a party message.|r Stay quiet, stay focused!")
             end
             return true  -- hide from chat
         end
@@ -225,7 +225,7 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
             local stored = StoreOutgoingMessage(event, message, nil, lineID)
             if stored then
                 addon.SaveActiveSession()
-                addon.Print("|cFFFFAAAA⚠ You used an emote.|r Stay quiet, stay focused!")
+                addon.Print("|cFFFFAAAAYou used an emote.|r Stay quiet, stay focused!")
             end
             return true  -- hide from chat
         end

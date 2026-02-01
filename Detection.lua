@@ -28,7 +28,9 @@ addon.MuteRoundChat = function()
     if C_SocialRestrictions and C_SocialRestrictions.SetChatDisabled then
         C_SocialRestrictions.SetChatDisabled(true)
         addon._roundChatMuted = true
-        addon.Print("|cFFFF6666⚔ Round started:|r All chat disabled.")
+        if addon.debugFilters then
+            addon.Print("|cFFFF6666Round started:|r All chat disabled.")
+        end
     end
 end
 
@@ -42,7 +44,9 @@ addon.UnmuteRoundChat = function()
     if C_SocialRestrictions and C_SocialRestrictions.SetChatDisabled then
         C_SocialRestrictions.SetChatDisabled(restoreState)
         addon._roundChatMuted = false
-        addon.Print("|cFF00FF00✓ Round ended:|r Chat restored.")
+        if addon.debugFilters then
+            addon.Print("|cFF00FF00Round ended:|r Chat restored.")
+        end
     end
 end
 
@@ -285,54 +289,43 @@ addon.RefreshMatchPlayers = function()
 
     local groupSize = GetNumGroupMembers and GetNumGroupMembers() or 0
 
+    -- Helper to safely add a player (handles "secret" values in rated PvP)
+    local function SafeAddPlayer(unitID)
+        local ok, err = pcall(function()
+            local name, realm = UnitFullName(unitID)
+            -- Skip if name is nil or secret
+            if not name or name == "" then return end
+            -- Validate name is a usable string (not a secret/protected value)
+            if type(name) ~= "string" or name:find("secret") then return end
+            
+            realm = realm or GetRealmName() or ""
+            if type(realm) ~= "string" then realm = "" end
+            
+            local fullName = name .. "-" .. realm
+            addon.matchPlayers[name] = true
+            addon.matchPlayersFull[fullName] = true
+            
+            local guid = UnitGUID(unitID)
+            if guid and type(guid) == "string" then
+                addon.matchPlayerGuids[guid] = true
+            end
+        end)
+        -- Silently ignore errors from protected/secret values
+    end
+
     -- Always add the player
-    local playerName, playerRealm = UnitFullName("player")
-    playerRealm = playerRealm or GetRealmName()
-    local playerShort = playerName or GetUnitName("player")
-    local playerFull = (playerShort and playerRealm) and (playerShort .. "-" .. playerRealm) or playerShort
-    local playerGuid = UnitGUID and UnitGUID("player")
-    if playerShort then
-        addon.matchPlayers[playerShort] = true
-    end
-    if playerFull then
-        addon.matchPlayersFull[playerFull] = true
-    end
-    if playerGuid then
-        addon.matchPlayerGuids[playerGuid] = true
-    end
+    SafeAddPlayer("player")
 
     -- Add group members (party or raid)
     if groupType == 2 then
         -- Raid group - Solo Shuffle uses this
         for i = 1, groupSize do
-            local unitID = "raid" .. i
-            local name, realm = UnitFullName(unitID)
-            if name then
-                realm = realm or GetRealmName()
-                local fullName = name .. "-" .. realm
-                addon.matchPlayers[name] = true
-                addon.matchPlayersFull[fullName] = true
-                local guid = UnitGUID(unitID)
-                if guid then
-                    addon.matchPlayerGuids[guid] = true
-                end
-            end
+            SafeAddPlayer("raid" .. i)
         end
     elseif groupType == 1 then
         -- Party group
         for i = 1, 4 do
-            local unitID = "party" .. i
-            local name, realm = UnitFullName(unitID)
-            if name then
-                realm = realm or GetRealmName()
-                local fullName = name .. "-" .. realm
-                addon.matchPlayers[name] = true
-                addon.matchPlayersFull[fullName] = true
-                local guid = UnitGUID(unitID)
-                if guid then
-                    addon.matchPlayerGuids[guid] = true
-                end
-            end
+            SafeAddPlayer("party" .. i)
         end
     end
     
@@ -340,17 +333,7 @@ addon.RefreshMatchPlayers = function()
     for i = 1, 5 do
         local unitID = "arena" .. i
         if UnitExists(unitID) then
-            local name, realm = UnitFullName(unitID)
-            if name then
-                realm = realm or GetRealmName()
-                local fullName = name .. "-" .. realm
-                addon.matchPlayers[name] = true
-                addon.matchPlayersFull[fullName] = true
-                local guid = UnitGUID(unitID)
-                if guid then
-                    addon.matchPlayerGuids[guid] = true
-                end
-            end
+            SafeAddPlayer(unitID)
         end
     end
 end
@@ -375,10 +358,14 @@ addon.CheckSoloShuffleStatus = function()
         inArenaInstance = (instanceType == "arena")
     end
     
+    -- DEBUG: Print detection status
+    if addon.debugFilters then
+        addon.Print(string.format("Detection: IsSoloShuffle=%s, InArena=%s, AlreadyIn=%s", 
+            tostring(inSoloShuffleMatch), tostring(inArenaInstance), tostring(addon.inSoloShuffle)))
+    end
+    
     -- Must be both: API says Solo Shuffle AND we're in arena instance
-    -- Also require at least 4 group members (Solo Shuffle has 6)
-    local hasEnoughPlayers = (GetNumGroupMembers() or 0) >= 4
-    inSoloShuffleMatch = inSoloShuffleMatch and inArenaInstance and hasEnoughPlayers
+    inSoloShuffleMatch = inSoloShuffleMatch and inArenaInstance
 
     if inSoloShuffleMatch then
         if not addon.inSoloShuffle then
@@ -455,7 +442,12 @@ addon.CheckSoloShuffleStatus = function()
 
         local zoneName = GetRealZoneText() or "Unknown"
         local endTime = time()
-        local sessionDuration = endTime - (addon.sessionStartTime or endTime)
+        -- Ensure sessionStartTime is valid; if nil or invalid, treat as full session to avoid false "too brief"
+        local startTime = addon.sessionStartTime
+        if not startTime or startTime > endTime then
+            startTime = endTime - 31  -- Assume at least 31 seconds passed if time is invalid
+        end
+        local sessionDuration = endTime - startTime
         
         -- Only save sessions that lasted at least 30 seconds
         -- This prevents phantom sessions from brief API glitches during zone transitions
@@ -625,7 +617,19 @@ frame:SetScript("OnEvent", function(self, event)
         -- Load saved chat frame preference
         if addon.savedData.outputChatFrame and addon.savedData.outputChatFrame ~= "" then
             addon.useDedicatedChatFrame = true
+            -- Try to find and cache the frame immediately
+            local frame = addon.FindChatFrameByName(addon.savedData.outputChatFrame)
+            if frame then
+                addon.dedicatedChatFrame = frame
+            end
         end
+
+        -- Validate chat frame selection after a short delay to handle late-loading frames
+        C_Timer.After(0.5, function()
+            if addon.ValidateChatFrameSelection then
+                addon.ValidateChatFrameSelection()
+            end
+        end)
 
         if addon.RegisterMinimapIcon and addon.RegisterMinimapIcon() then
             -- LibDBIcon handled

@@ -1,47 +1,127 @@
-# QuietShuffle AI coding instructions
+# QuietShuffle AI Coding Instructions
 
-## Project overview
-- World of Warcraft addon that mutes Solo Shuffle chat, captures filtered messages, and provides a UI for reviewing/reporting them.
-- Load order is defined in [QuietShuffle.toc](QuietShuffle.toc); global addon table is created in [Core.lua](Core.lua).
+## Project Overview
+World of Warcraft addon that mutes Solo Shuffle chat, captures filtered messages, and provides a UI for reviewing and reporting them.
 
-## Architecture & data flow
-- `Core.lua` initializes shared `addon` state, saved variables (`QuietShuffleSavedData`), and character-scoped history helpers. This file is the source of truth for shared tables like `addon.messages`, `addon.matchPlayers`, and `addon.sessionButtons`. Also defines `addon.CHAT_FILTER_EVENTS` and dedicated chat frame output logic.
-- `Detection.lua` owns Solo Shuffle detection and session lifecycle. It watches PvP/scenario events, toggles filtering, persists sessions to `QuietShuffleSavedData.characters[characterKey].history`, and handles `PLAYER_LOGIN` initialization.
-- `Filters.lua` registers chat event filters and stores messages. `addon.InterceptChatMessage()` returns `true` to suppress messages while saving metadata (sender, GUID, lineID, class). Includes deduplication logic to prevent duplicate captures from multiple hooks, wrapped in `pcall` for error resilience.
-- `UI.lua` renders the history window, session list, and report UI. It reads from `addon.messages` (current session) and saved history and uses pooled rows in `addon.messageRows`.
-- `Settings.lua` wires the settings panel, clears history, and provides the dedicated chat frame output configuration.
-- `Slash.lua` wires `/qs` commands including test mode (`/qs test start|stop`), debug mode (`/qs debug on|off`), and chat frame output (`/qs chatframe <name>`).
+## Architecture
 
-## Key conventions & patterns
-- Shared state lives on the `addon` table (from `local _, addon = ...`). Prefer attaching new state/functions there instead of globals.
-- Sessions are stored per-character in `QuietShuffleSavedData.characters["Name-Realm"].history`; legacy migration happens in [Detection.lua](Detection.lua).
-- Chat filtering is event-based: update or add events in `addon.CHAT_FILTER_EVENTS` (in [Core.lua](Core.lua)) and ensure `Filters.lua` handles the event payload.
-- UI uses reusable frames (`addon.messageRows`, `addon.sessionButtons`) instead of recreating on refresh; follow this pattern to avoid leaks.
-- Use `wipe(table)` instead of `table = {}` when clearing tables to preserve references.
-- Wrap critical filter callbacks in `pcall` to prevent errors from permanently breaking chat filtering.
+### File Responsibilities
+| File | Purpose |
+|------|---------|
+| `Core.lua` | Shared state, utility functions, chat output logic. Source of truth for `addon.messages`, `addon.matchPlayers`, `addon.CHAT_FILTER_EVENTS`. |
+| `Detection.lua` | Solo Shuffle detection, session lifecycle, `PLAYER_LOGIN` initialization, SavedVariables loading. |
+| `Filters.lua` | Chat event filters, message capture logic. `InterceptChatMessage()` suppresses and stores messages. |
+| `UI.lua` | History window, session list, message display, report UI. Uses pooled frames. |
+| `Settings.lua` | Settings panel UI, chat tab dropdown. |
+| `Slash.lua` | Slash command handling (`/qs`). |
 
-## Features
-- **Message filtering**: Suppresses party, instance, say, yell, emote, and whisper messages during Solo Shuffle.
-- **Message capture**: Stores filtered messages with metadata (sender, class, GUID, lineID, timestamp) for later review.
-- **History UI**: Multi-character session browser with message display and player right-click menus.
-- **Report integration**: Report players directly from captured messages using Blizzard's `C_ReportSystem`.
-- **Chat bubbles**: Automatically disables chat bubbles during Solo Shuffle and restores them after.
-- **Dedicated chat output**: Route addon messages to a specific chat tab (configurable via settings or `/qs chatframe <name>`).
-- **Debug mode**: `/qs debug on` prints filter events with red highlighting for failures.
-- **Test mode**: `/qs test start|stop` simulates Solo Shuffle for UI testing without being in a match.
+### Load Order (from QuietShuffle.toc)
+1. Libs (LibStub, LibDataBroker, LibDBIcon)
+2. Core.lua
+3. Filters.lua
+4. UI.lua
+5. Detection.lua
+6. Slash.lua
+7. Settings.lua
 
-## Developer workflows (WoW addon)
-- There is no build step; install by placing the folder under `Interface/AddOns/QuietShuffle` and use `/reload` in-game after edits.
-- Use `/qs` to inspect status, `/qs history` to open the UI, and `/qs test start|stop` to simulate a Solo Shuffle session for UI testing.
-- Use `/qs debug on` to enable verbose filter logging; failures appear in red.
+### Data Flow
+- `QuietShuffleSavedData` is loaded during `PLAYER_LOGIN` in Detection.lua
+- `addon.savedData` references `QuietShuffleSavedData` after login
+- Sessions are stored per-character in `savedData.characters["Name-Realm"].history`
+- Current session messages live in `addon.messages` (transient until match ends)
 
-## API Reference
-- **WoW UI Source**: https://github.com/Gethe/wow-ui-source — Mirror of Blizzard's UI code. Use this to verify API signatures, event payloads, frame templates, and find implementation patterns.
-- Relies on WoW API: chat filters (`ChatFrame_AddMessageEventFilter`), PvP/scenario state (`C_PvP`, `C_Scenario`), and UI frames.
-- Report UI integrates with `ReportFrame`/`C_ReportSystem` using chat line IDs when available (see [UI.lua](UI.lua)).
+## Code Standards
 
-## Examples to follow
-- Session lifecycle and persistence: [Detection.lua](Detection.lua).
-- Message capture and metadata extraction: [Filters.lua](Filters.lua).
-- History UI layout and row pooling: [UI.lua](UI.lua).
-- Settings panel with input fields: [Settings.lua](Settings.lua).
+### General Principles
+- **Clarity over cleverness**: Write code that is easy to read and reason about.
+- **Small, focused functions**: Each function should do one thing well.
+- **Predictable control flow**: Avoid hidden side effects and unexpected state changes.
+- **Minimal coupling**: Systems should be independent and not interfere with each other.
+- **Explicit naming**: Variable and function names should describe their purpose.
+
+### Critical Rules
+1. **Never call `addon.Print()` from within `GetDedicatedChatFrame()`** — this causes infinite recursion.
+2. **`GetDedicatedChatFrame()` must be side-effect free** — it returns a frame or nil, nothing else.
+3. **SavedVariables are only available after `PLAYER_LOGIN`** — don't access them during file load.
+4. **Wrap filter callbacks in `pcall`** — errors in filters permanently break chat.
+5. **Use `wipe(table)` instead of `table = {}`** — preserves references held elsewhere.
+
+### Chat Frame Handling
+The chat tab selection feature must be:
+- **Isolated**: No interference with Solo Shuffle detection or any other system.
+- **Side-effect free**: `GetDedicatedChatFrame()` only returns a frame, never modifies state.
+- **Validated separately**: `ValidateChatFrameSelection()` handles missing tabs with deferred notifications.
+
+### Solo Shuffle Detection
+Detection runs independently via:
+- Periodic ticker (`C_Timer.NewTicker` every 5 seconds)
+- Event-driven checks (`PLAYER_ENTERING_WORLD`, `PVP_MATCH_ACTIVE`, etc.)
+
+Detection logic:
+1. `IsSoloShuffleMatch()` checks C_PvP APIs, scenario info, and battlefield status
+2. `CheckSoloShuffleStatus()` enables/disables filtering based on match state
+3. `EnableMessageFiltering()` registers chat filters (once only)
+4. `DisableMessageFiltering()` sets flag to false but keeps filters registered
+
+## Patterns
+
+### State Management
+```lua
+-- Shared state on addon table
+addon.inSoloShuffle = false
+addon.filteringEnabled = false
+addon.messages = {}
+
+-- Use wipe() to clear, not reassignment
+wipe(addon.messages)
+```
+
+### Frame Pooling
+```lua
+-- Reuse frames instead of creating new ones
+addon.messageRows = addon.messageRows or {}
+local row = addon.messageRows[index] or CreateFrame(...)
+addon.messageRows[index] = row
+```
+
+### Error Resilience
+```lua
+-- Wrap critical callbacks in pcall
+local ok, result = pcall(function()
+    -- risky code
+end)
+if not ok then
+    return false  -- fail gracefully
+end
+```
+
+## Testing
+
+### Commands
+- `/qs` — Show status and help
+- `/qs history` — Open history window
+- `/qs test start` — Simulate Solo Shuffle (for UI testing)
+- `/qs test stop` — End test mode
+- `/qs debug on|off` — Toggle verbose logging
+
+### Verification
+1. Enter Solo Shuffle → "Solo Shuffle started! Muting chat." should print
+2. Chat messages should be suppressed and captured
+3. Exit Solo Shuffle → "Solo Shuffle ended! Chat restored." should print
+4. History should show captured messages
+
+## Common Pitfalls
+
+### Infinite Recursion
+Functions that call `addon.Print()` must never be called FROM `addon.Print()`.
+Bad: `GetDedicatedChatFrame()` calls `Print()` → `Print()` calls `GetDedicatedChatFrame()` → crash
+
+### SavedVariables Timing
+`QuietShuffleSavedData` is nil until `PLAYER_LOGIN`. Code that runs at file load cannot access it.
+
+### Filter Registration
+Filters should be registered once and controlled via `addon.filteringEnabled` flag. Adding/removing filters repeatedly can cause duplicates or missed messages.
+
+## References
+- **WoW UI Source**: https://github.com/Gethe/wow-ui-source
+- **WoW API**: https://wowpedia.fandom.com/wiki/World_of_Warcraft_API

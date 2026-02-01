@@ -56,7 +56,20 @@ local function CreateSettingsPanel()
     titleDivider:SetHeight(8)
     titleDivider:SetTexture("Interface\\COMMON\\UI-TooltipDivider-Transparent")
 
-    local yOffset = -80
+    -- Development notice
+    local devNotice = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    devNotice:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -56)
+    devNotice:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+    devNotice:SetJustifyH("LEFT")
+    devNotice:SetText("|cFFFFCC00This addon is in active development.|r Feedback and bug reports are welcome!")
+
+    -- Links below notice
+    local linksText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    linksText:SetPoint("TOPLEFT", devNotice, "BOTTOMLEFT", 0, -4)
+    linksText:SetJustifyH("LEFT")
+    linksText:SetText("|cFF88CCFFCurseForge:|r curseforge.com/wow/addons/quietshuffle  |  |cFF88CCFFGitHub:|r github.com/Nickdrw/QuietShuffle")
+
+    local yOffset = -105
 
     -- Buttons section
     local clearButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
@@ -310,7 +323,7 @@ local function CreateSettingsPanel()
 
     -- Support section (anchored to bottom)
     local supportLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    supportLabel:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 60)
+    supportLabel:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 90)
     supportLabel:SetText("Support the Developer")
 
     -- URL display popup frame (shared between buttons)
@@ -394,7 +407,7 @@ local function CreateSettingsPanel()
     local spreadButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     spreadButton:SetPoint("LEFT", patreonButton, "RIGHT", 12, 0)
     spreadButton:SetSize(180, 26)
-    spreadButton:SetText("Spread the word")
+    spreadButton:SetText("View on CurseForge")
     spreadButton:SetScript("OnClick", function()
         ShowURL("https://www.curseforge.com/wow/addons/quietshuffle", "CurseForge - Share with friends! (Ctrl+C to copy)")
     end)
@@ -405,6 +418,21 @@ local function CreateSettingsPanel()
     curseforgeIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\curseforge")
     spreadButton.Text:SetPoint("CENTER", spreadButton, "CENTER", 8, 0)
 
+    -- GitHub button
+    local githubButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    githubButton:SetPoint("TOPLEFT", paypalButton, "BOTTOMLEFT", 0, -8)
+    githubButton:SetSize(180, 26)
+    githubButton:SetText("Project on GitHub")
+    githubButton:SetScript("OnClick", function()
+        ShowURL("https://github.com/Nickdrw/QuietShuffle", "GitHub - Project page (Ctrl+C to copy)")
+    end)
+
+    local githubIcon = githubButton:CreateTexture(nil, "ARTWORK")
+    githubIcon:SetSize(16, 16)
+    githubIcon:SetPoint("LEFT", githubButton, "LEFT", 8, 0)
+    githubIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\github")
+    githubButton.Text:SetPoint("CENTER", githubButton, "CENTER", 8, 0)
+
     panel:HookScript("OnShow", function()
         if addon.IsEnabled then
             enableCheckbox:SetChecked(addon.IsEnabled())
@@ -413,8 +441,11 @@ local function CreateSettingsPanel()
         end
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
         minimapCheckbox:SetChecked(not QuietShuffleLDBIconDB.hide)
-        -- Load saved chat frame selection
+        -- Validate and refresh chat frame selection
         addon.savedData = addon.savedData or {}
+        if addon.ValidateChatFrameSelection then
+            addon.ValidateChatFrameSelection()
+        end
         if addon.RefreshChatFrameDropdown then
             addon.RefreshChatFrameDropdown()
         end
