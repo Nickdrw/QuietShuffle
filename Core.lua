@@ -31,14 +31,25 @@ addon.FindChatFrameByName = function(name)
     return nil
 end
 
+-- Create a new chat tab with the given name
+addon.CreateChatTab = function(name)
+    -- Use WoW's built-in function to create a new chat window
+    FCF_OpenNewWindow(name)
+    -- Wait a frame and then find the newly created window
+    C_Timer.After(0.1, function()
+        local frame = addon.FindChatFrameByName(name)
+        if frame then
+            addon.dedicatedChatFrame = frame
+        end
+    end)
+    -- Return the frame immediately (it should exist after FCF_OpenNewWindow)
+    return addon.FindChatFrameByName(name)
+end
+
 -- Get or create the dedicated QuietShuffle chat frame
 addon.GetDedicatedChatFrame = function()
     if not addon.useDedicatedChatFrame then
         return nil
-    end
-    -- Check if we have a cached valid frame
-    if addon.dedicatedChatFrame and addon.dedicatedChatFrame:IsShown() then
-        return addon.dedicatedChatFrame
     end
     -- Get the configured chat frame name from saved data
     local chatFrameName = addon.savedData and addon.savedData.outputChatFrame
@@ -51,6 +62,15 @@ addon.GetDedicatedChatFrame = function()
         addon.dedicatedChatFrame = frame
         return frame
     end
+    -- Tab doesn't exist - reset to General tab
+    addon.savedData.outputChatFrame = nil
+    addon.useDedicatedChatFrame = false
+    addon.dedicatedChatFrame = nil
+    -- Update settings panel if it's open
+    if addon.RefreshChatFrameDropdown then
+        addon.RefreshChatFrameDropdown()
+    end
+    addon.Print("Chat tab '" .. chatFrameName .. "' not found. Reverting to General tab.")
     return nil
 end
 
@@ -67,10 +87,11 @@ addon.Print = function(...)
     
     -- Try to use dedicated chat frame if enabled
     local dedicatedFrame = addon.GetDedicatedChatFrame()
-    if dedicatedFrame then
+    if dedicatedFrame and dedicatedFrame:IsShown() then
         dedicatedFrame:AddMessage(msg)
     else
-        print(msg)
+        -- Fall back to default chat (usually General)
+        DEFAULT_CHAT_FRAME:AddMessage(msg)
     end
 end
 
@@ -95,7 +116,7 @@ addon.CreateSupportPopup = function()
     end
 
     local popup = CreateFrame("Frame", "QuietShuffleSupportPopup", UIParent, "BackdropTemplate")
-    popup:SetSize(420, 180)
+    popup:SetSize(480, 180)
     popup:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
     popup:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -169,14 +190,20 @@ addon.CreateSupportPopup = function()
     end
 
     -- PayPal button (center the group of 3 buttons)
-    -- Total width: 120 + 8 + 140 + 8 + 120 = 396, so offset by -198 to center
+    -- Total width: 140 + 8 + 140 + 8 + 140 = 436, so offset left edge by -218, center at -148
     local paypalButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
-    paypalButton:SetPoint("TOP", subtitle, "BOTTOM", -138, -16)
-    paypalButton:SetSize(120, 26)
+    paypalButton:SetPoint("TOPLEFT", subtitle, "BOTTOM", -218, -16)
+    paypalButton:SetSize(140, 26)
     paypalButton:SetText("Buy me a coffee")
     paypalButton:SetScript("OnClick", function()
         ShowURL("https://paypal.me/NickDrw")
     end)
+
+    local paypalIcon = paypalButton:CreateTexture(nil, "ARTWORK")
+    paypalIcon:SetSize(16, 16)
+    paypalIcon:SetPoint("LEFT", paypalButton, "LEFT", 8, 0)
+    paypalIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\paypal")
+    paypalButton.Text:SetPoint("CENTER", paypalButton, "CENTER", 8, 0)
 
     -- Patreon button
     local patreonButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
@@ -187,14 +214,26 @@ addon.CreateSupportPopup = function()
         ShowURL("https://patreon.com/NickDrew")
     end)
 
+    local patreonIcon = patreonButton:CreateTexture(nil, "ARTWORK")
+    patreonIcon:SetSize(16, 16)
+    patreonIcon:SetPoint("LEFT", patreonButton, "LEFT", 8, 0)
+    patreonIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\patreon")
+    patreonButton.Text:SetPoint("CENTER", patreonButton, "CENTER", 8, 0)
+
     -- Spread the Word button
     local spreadButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
     spreadButton:SetPoint("LEFT", patreonButton, "RIGHT", 8, 0)
-    spreadButton:SetSize(120, 26)
+    spreadButton:SetSize(140, 26)
     spreadButton:SetText("Spread the word")
     spreadButton:SetScript("OnClick", function()
-        ShowURL("https://www.curseforge.com/wow/addons/PLACEHOLDER")
+        ShowURL("https://www.curseforge.com/wow/addons/quietshuffle")
     end)
+
+    local curseforgeIcon = spreadButton:CreateTexture(nil, "ARTWORK")
+    curseforgeIcon:SetSize(16, 16)
+    curseforgeIcon:SetPoint("LEFT", spreadButton, "LEFT", 8, 0)
+    curseforgeIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\curseforge")
+    spreadButton.Text:SetPoint("CENTER", spreadButton, "CENTER", 8, 0)
 
     -- Hint text
     local hint = popup:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")

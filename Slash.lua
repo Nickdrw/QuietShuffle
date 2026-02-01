@@ -7,64 +7,49 @@ local _, addon = ...
 SlashCmdList["QUIETSHUFFLE"] = function(msg)
     local command, arg = msg:match("^(%S+)%s*(.*)")
 
+    -- Allow enable/disable commands even when addon is disabled
+    if command == "enable" then
+        if addon.SetEnabled then
+            addon.SetEnabled(true)
+            addon.Print("|cFF00FF00QuietShuffle enabled|r")
+        end
+        return
+    end
+
+    if command == "disable" then
+        if addon.SetEnabled then
+            addon.SetEnabled(false)
+            addon.Print("|cFFFF0000QuietShuffle disabled|r")
+        end
+        return
+    end
+
     if addon.IsEnabled and not addon.IsEnabled() then
-        addon.Print("Disabled")
+        addon.Print("|cFFFF0000QuietShuffle disabled|r")
+        addon.Print("Use |cFFFFD700/qs enable|r to enable the addon, or check the box in the Settings panel.")
         return
     end
 
     if not command or command == "" then
-        addon.Print("List of available commands")
-        addon.Print("/qs status - Show status")
-        addon.Print("/qs history - Show message history window")
-        addon.Print("/qs clear - Clear current messages")
-        addon.Print("/qs chatframe - Toggle dedicated chat tab output")
-        addon.Print("/qs debug on|off - Toggle debug output")
-        return
-    end
-
-    if command == "status" then
-        if addon.CheckSoloShuffleStatus then
-            addon.CheckSoloShuffleStatus()
-        end
-        local inSoloShuffleMatch = addon.IsSoloShuffleMatch and addon.IsSoloShuffleMatch() or false
-        if inSoloShuffleMatch then
-            addon.Print("Currently IN Solo Shuffle (muting active)")
+        -- Show enabled/disabled status
+        local enabled = addon.IsEnabled and addon.IsEnabled()
+        if enabled then
+            addon.Print("|cFF00FF00QuietShuffle enabled|r")
         else
-            addon.Print("NOT in Solo Shuffle")
+            addon.Print("|cFFFF0000QuietShuffle disabled|r")
         end
-        if addon.PrintStoredMessages then
-            addon.PrintStoredMessages()
-        end
+        addon.Print("List of available commands")
+        addon.Print("/qs enable - Enable the addon")
+        addon.Print("/qs disable - Disable the addon")
+        addon.Print("/qs settings - Open settings panel")
+        addon.Print("/qs history - Show message history window")
         return
     end
 
-    if command == "test" and arg == "start" then
-        addon.isTestMode = true
-        if addon.CheckSoloShuffleStatus then
-            addon.CheckSoloShuffleStatus()
+    if command == "settings" then
+        if addon.OpenSettings then
+            addon.OpenSettings()
         end
-        return
-    end
-
-
-
-    if command == "test" and arg == "stop" then
-        if not addon.inSoloShuffle then
-            addon.Print("Solo Shuffle was not started. Use '/qs test start' first.")
-            return
-        end
-
-        addon.isTestMode = false
-        if addon.CheckSoloShuffleStatus then
-            addon.CheckSoloShuffleStatus()
-        end
-        return
-    end
-
-    if command == "clear" then
-        addon.messages = addon.messages or {}
-        wipe(addon.messages)
-        addon.Print("Stored messages cleared.")
         return
     end
 
@@ -75,31 +60,7 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
         return
     end
 
-    if command == "chatframe" then
-        -- Toggle or set chat frame. Usage: /qs chatframe [name]
-        addon.savedData = addon.savedData or {}
-        if arg and arg ~= "" then
-            -- Set specific chat frame
-            addon.savedData.outputChatFrame = arg
-            addon.useDedicatedChatFrame = true
-            addon.dedicatedChatFrame = nil
-            local frame = addon.FindChatFrameByName(arg)
-            if frame then
-                addon.Print("Using '" .. arg .. "' chat tab for output.")
-            else
-                addon.Print("Chat tab '" .. arg .. "' not found. Create it or check spelling.")
-            end
-        else
-            -- Toggle off
-            addon.savedData.outputChatFrame = nil
-            addon.useDedicatedChatFrame = false
-            addon.dedicatedChatFrame = nil
-            addon.Print("Using default chat frame for output.")
-            addon.Print("Use /qs chatframe <name> to set a specific tab, or configure in Settings.")
-        end
-        return
-    end
-
+    -- Debug command (hidden from help)
     if command == "debug" then
         if arg == "on" or arg == "off" then
             addon.debugFilters = (arg == "on")
@@ -126,10 +87,15 @@ SlashCmdList["QUIETSHUFFLE"] = function(msg)
     end
 
     addon.Print("Unknown command.")
+    -- Show enabled/disabled status
+    local enabled = addon.IsEnabled and addon.IsEnabled()
+    if enabled then
+        addon.Print("|cFF00FF00QuietShuffle enabled|r")
+    else
+        addon.Print("|cFFFF0000QuietShuffle disabled|r")
+    end
     addon.Print("List of available commands")
-    addon.Print("/qs status - Show status")
+    addon.Print("/qs enable - Enable the addon")
+    addon.Print("/qs disable - Disable the addon")
     addon.Print("/qs history - Show message history window")
-    addon.Print("/qs clear - Clear current messages")
-    addon.Print("/qs chatframe - Toggle dedicated chat tab output")
-    addon.Print("/qs debug on|off - Toggle debug output")
 end

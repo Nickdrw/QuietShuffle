@@ -48,13 +48,19 @@ local function CreateSettingsPanel()
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
     title:SetText("QuietShuffle")
+    title:SetTextColor(1, 1, 1)
 
-    local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    subtitle:SetText("Settings")
+    local titleDivider = panel:CreateTexture(nil, "ARTWORK")
+    titleDivider:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+    titleDivider:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+    titleDivider:SetHeight(8)
+    titleDivider:SetTexture("Interface\\COMMON\\UI-TooltipDivider-Transparent")
 
+    local yOffset = -80
+
+    -- Buttons section
     local clearButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    clearButton:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16)
+    clearButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, yOffset)
     clearButton:SetSize(140, 24)
     clearButton:SetText("Clear History")
     clearButton:SetScript("OnClick", ConfirmClearHistory)
@@ -74,18 +80,36 @@ local function CreateSettingsPanel()
         end
     end)
 
-    local enableCheckbox = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
-    enableCheckbox:SetPoint("TOPLEFT", clearButton, "BOTTOMLEFT", 0, -12)
-    enableCheckbox.Text:SetText("Enable QuietShuffle")
+    yOffset = yOffset - 40
+
+    -- 4-column layout (label/control pairs)
+    local col1X = 16
+    local col2X = 260
+    local col3X = 420
+    local col4X = 660
+
+    -- Enable QuietShuffle
+    local enableLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", col1X, yOffset)
+    enableLabel:SetText("Enable QuietShuffle")
+
+    local enableCheckbox = CreateFrame("CheckButton", "QuietShuffle_EnableCheckbox", panel, "InterfaceOptionsCheckButtonTemplate")
+    enableCheckbox:SetPoint("TOPLEFT", panel, "TOPLEFT", col2X, yOffset + 2)
     enableCheckbox:SetScript("OnClick", function(self)
         if addon.SetEnabled then
             addon.SetEnabled(self:GetChecked())
         end
     end)
 
-    local minimapCheckbox = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
-    minimapCheckbox:SetPoint("TOPLEFT", enableCheckbox, "BOTTOMLEFT", 0, -8)
-    minimapCheckbox.Text:SetText("Show Minimap Button")
+    yOffset = yOffset - 42
+
+    -- Show Minimap Button
+    local minimapLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    minimapLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", col1X, yOffset)
+    minimapLabel:SetText("Show Minimap Button")
+
+    local minimapCheckbox = CreateFrame("CheckButton", "QuietShuffle_MinimapCheckbox", panel, "InterfaceOptionsCheckButtonTemplate")
+    minimapCheckbox:SetPoint("TOPLEFT", panel, "TOPLEFT", col2X, yOffset + 2)
     minimapCheckbox:SetScript("OnClick", function(self)
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
         QuietShuffleLDBIconDB.hide = not self:GetChecked()
@@ -105,62 +129,184 @@ local function CreateSettingsPanel()
         end
     end)
 
-    -- Chat frame output settings
-    local chatFrameLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    chatFrameLabel:SetPoint("TOPLEFT", minimapCheckbox, "BOTTOMLEFT", 0, -16)
-    chatFrameLabel:SetText("Output Chat Tab Name:")
+    yOffset = yOffset - 42
 
-    local chatFrameInput = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-    chatFrameInput:SetPoint("TOPLEFT", chatFrameLabel, "BOTTOMLEFT", 6, -4)
-    chatFrameInput:SetSize(150, 22)
-    chatFrameInput:SetAutoFocus(false)
-    chatFrameInput:SetScript("OnEnterPressed", function(self)
-        local text = self:GetText():trim()
+    -- Output Chat Tab
+    local chatFrameLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    chatFrameLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", col1X, yOffset)
+    chatFrameLabel:SetText("Output Chat Tab")
+
+    local chatFrameDropdown = CreateFrame("Frame", "QuietShuffle_ChatTabDropdown", panel, "UIDropDownMenuTemplate")
+    chatFrameDropdown:SetPoint("TOPLEFT", panel, "TOPLEFT", col2X - 16, yOffset)
+
+    local function GetDefaultChatTabName()
+        local tab = _G["ChatFrame1Tab"]
+        local name = tab and tab:GetText()
+        if name and name ~= "" then
+            return name
+        end
+        return "General"
+    end
+
+    local function ApplyChatFrameSelection(tabName)
         addon.savedData = addon.savedData or {}
-        if text == "" then
+        if not tabName or tabName == "" then
             addon.savedData.outputChatFrame = nil
             addon.useDedicatedChatFrame = false
             addon.dedicatedChatFrame = nil
             addon.Print("Using default chat frame for output.")
         else
-            addon.savedData.outputChatFrame = text
-            addon.useDedicatedChatFrame = true
-            addon.dedicatedChatFrame = nil  -- Force re-lookup
-            local frame = addon.FindChatFrameByName(text)
+            local frame = addon.FindChatFrameByName(tabName)
             if frame then
-                addon.Print("Using '" .. text .. "' chat tab for output.")
+                addon.savedData.outputChatFrame = tabName
+                addon.useDedicatedChatFrame = true
+                addon.dedicatedChatFrame = nil
+                addon.Print("Using '" .. tabName .. "' chat tab for output.")
             else
-                addon.Print("Chat tab '" .. text .. "' not found. Create it or check spelling.")
+                addon.savedData.outputChatFrame = nil
+                addon.useDedicatedChatFrame = false
+                addon.dedicatedChatFrame = nil
+                addon.Print("Chat tab '" .. tabName .. "' not found. Reverting to General tab.")
             end
         end
-        self:ClearFocus()
-    end)
-    chatFrameInput:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-    end)
+        if addon.RefreshChatFrameDropdown then
+            addon.RefreshChatFrameDropdown()
+        end
+    end
 
-    local defaultButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    defaultButton:SetPoint("LEFT", chatFrameInput, "RIGHT", 8, 0)
-    defaultButton:SetSize(70, 22)
-    defaultButton:SetText("Default")
-    defaultButton:SetScript("OnClick", function()
-        chatFrameInput:SetText("General")
-        chatFrameInput:GetScript("OnEnterPressed")(chatFrameInput)
-    end)
+    local function InitializeChatFrameDropdown()
+        local defaultName = GetDefaultChatTabName()
+        local function GetAllVisibleChatFrames()
+            local frames = {}
+            local dockedSet = {}
 
-    local clearChatFrameButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    clearChatFrameButton:SetPoint("LEFT", defaultButton, "RIGHT", 4, 0)
-    clearChatFrameButton:SetSize(60, 22)
-    clearChatFrameButton:SetText("Clear")
-    clearChatFrameButton:SetScript("OnClick", function()
-        chatFrameInput:SetText("")
-        chatFrameInput:GetScript("OnEnterPressed")(chatFrameInput)
-    end)
+            if type(FCFDock_GetChatFrames) == "function" and GENERAL_CHAT_DOCK then
+                local dockedFrames = FCFDock_GetChatFrames(GENERAL_CHAT_DOCK)
+                if dockedFrames then
+                    for _, frame in ipairs(dockedFrames) do
+                        table.insert(frames, frame)
+                        dockedSet[frame] = true
+                    end
+                end
+            elseif type(DOCKED_CHAT_FRAMES) == "table" then
+                for _, frameName in ipairs(DOCKED_CHAT_FRAMES) do
+                    local frame = _G[frameName]
+                    if frame then
+                        table.insert(frames, frame)
+                        dockedSet[frame] = true
+                    end
+                end
+            end
 
-    local chatFrameHint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    chatFrameHint:SetPoint("TOPLEFT", chatFrameInput, "BOTTOMLEFT", -6, -4)
-    chatFrameHint:SetText("Leave empty for default chat. Press Enter to apply.")
-    chatFrameHint:SetTextColor(0.6, 0.6, 0.6)
+            for i = 1, NUM_CHAT_WINDOWS do
+                local frame = _G["ChatFrame" .. i]
+                if frame and frame:IsShown() and not dockedSet[frame] then
+                    table.insert(frames, frame)
+                end
+            end
+
+            return frames
+        end
+
+        UIDropDownMenu_Initialize(chatFrameDropdown, function(self, level)
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = defaultName
+            info.value = nil
+            info.func = function()
+                ApplyChatFrameSelection(nil)
+            end
+            info.checked = not addon.savedData.outputChatFrame
+            UIDropDownMenu_AddButton(info, level)
+
+            local allFrames = GetAllVisibleChatFrames()
+            for _, frame in ipairs(allFrames) do
+                local tab = _G[frame:GetName() .. "Tab"]
+                if tab and tab:IsShown() then
+                    local tabName = tab:GetText()
+                    if tabName and tabName ~= "" and tabName ~= defaultName and tabName ~= COMBAT_LOG and tabName ~= "Combat Log" then
+                        info = UIDropDownMenu_CreateInfo()
+                        info.text = tabName
+                        info.value = tabName
+                        info.func = function()
+                            ApplyChatFrameSelection(tabName)
+                        end
+                        info.checked = (addon.savedData.outputChatFrame == tabName)
+                        UIDropDownMenu_AddButton(info, level)
+                    end
+                end
+            end
+        end)
+    end
+
+    addon.RefreshChatFrameDropdown = function()
+        if not chatFrameDropdown then
+            return
+        end
+        local defaultName = GetDefaultChatTabName()
+        
+        -- Build list of currently visible tabs
+        local validTabs = {}
+        validTabs[defaultName] = true
+        
+        local function GetAllVisibleChatFrames()
+            local frames = {}
+            local dockedSet = {}
+            if type(FCFDock_GetChatFrames) == "function" and GENERAL_CHAT_DOCK then
+                local dockedFrames = FCFDock_GetChatFrames(GENERAL_CHAT_DOCK)
+                if dockedFrames then
+                    for _, frame in ipairs(dockedFrames) do
+                        table.insert(frames, frame)
+                        dockedSet[frame] = true
+                    end
+                end
+            elseif type(DOCKED_CHAT_FRAMES) == "table" then
+                for _, frameName in ipairs(DOCKED_CHAT_FRAMES) do
+                    local frame = _G[frameName]
+                    if frame then
+                        table.insert(frames, frame)
+                        dockedSet[frame] = true
+                    end
+                end
+            end
+            for i = 1, NUM_CHAT_WINDOWS do
+                local frame = _G["ChatFrame" .. i]
+                if frame and frame:IsShown() and not dockedSet[frame] then
+                    table.insert(frames, frame)
+                end
+            end
+            return frames
+        end
+        
+        -- Collect valid tab names
+        local allFrames = GetAllVisibleChatFrames()
+        for _, frame in ipairs(allFrames) do
+            local tab = _G[frame:GetName() .. "Tab"]
+            if tab and tab:IsShown() then
+                local tabName = tab:GetText()
+                if tabName and tabName ~= "" and tabName ~= COMBAT_LOG and tabName ~= "Combat Log" then
+                    validTabs[tabName] = true
+                end
+            end
+        end
+        
+        -- Check if saved selection is still valid
+        local selected = addon.savedData and addon.savedData.outputChatFrame or nil
+        if selected and not validTabs[selected] then
+            -- Selected tab no longer exists, reset
+            addon.savedData.outputChatFrame = nil
+            addon.useDedicatedChatFrame = false
+            addon.dedicatedChatFrame = nil
+            selected = nil
+        end
+        
+        -- Display General if no valid selection
+        UIDropDownMenu_SetText(chatFrameDropdown, selected or defaultName)
+        InitializeChatFrameDropdown()
+    end
+
+    addon.chatFrameDropdown = chatFrameDropdown
+    UIDropDownMenu_SetWidth(chatFrameDropdown, 170)
+    addon.RefreshChatFrameDropdown()
 
     -- Support section (anchored to bottom)
     local supportLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -215,19 +361,18 @@ local function CreateSettingsPanel()
     -- PayPal button
     local paypalButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     paypalButton:SetPoint("TOPLEFT", supportLabel, "BOTTOMLEFT", 0, -8)
-    paypalButton:SetSize(160, 26)
+    paypalButton:SetSize(180, 26)
     paypalButton:SetText("Buy me a coffee")
     paypalButton:SetScript("OnClick", function()
         -- PayPal link
         ShowURL("https://paypal.me/NickDrw", "PayPal - Buy me a coffee (Ctrl+C to copy)")
     end)
 
-    -- Icon placeholder for PayPal (16x16 recommended)
     local paypalIcon = paypalButton:CreateTexture(nil, "ARTWORK")
     paypalIcon:SetSize(16, 16)
     paypalIcon:SetPoint("LEFT", paypalButton, "LEFT", 8, 0)
-    -- paypalIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\paypal")  -- Uncomment when icon added
-    paypalButton.icon = paypalIcon
+    paypalIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\paypal")
+    paypalButton.Text:SetPoint("CENTER", paypalButton, "CENTER", 8, 0)
 
     -- Patreon button
     local patreonButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
@@ -239,29 +384,26 @@ local function CreateSettingsPanel()
         ShowURL("https://patreon.com/NickDrew", "Patreon - Support me (Ctrl+C to copy)")
     end)
 
-    -- Icon placeholder for Patreon (16x16 recommended)
     local patreonIcon = patreonButton:CreateTexture(nil, "ARTWORK")
     patreonIcon:SetSize(16, 16)
     patreonIcon:SetPoint("LEFT", patreonButton, "LEFT", 8, 0)
-    -- patreonIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\patreon")  -- Uncomment when icon added
-    patreonButton.icon = patreonIcon
+    patreonIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\patreon")
+    patreonButton.Text:SetPoint("CENTER", patreonButton, "CENTER", 8, 0)
 
     -- Spread the Word button
     local spreadButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     spreadButton:SetPoint("LEFT", patreonButton, "RIGHT", 12, 0)
-    spreadButton:SetSize(140, 26)
+    spreadButton:SetSize(180, 26)
     spreadButton:SetText("Spread the word")
     spreadButton:SetScript("OnClick", function()
-        -- Placeholder URL - replace with actual CurseForge link
-        ShowURL("https://www.curseforge.com/wow/addons/PLACEHOLDER", "CurseForge - Share with friends! (Ctrl+C to copy)")
+        ShowURL("https://www.curseforge.com/wow/addons/quietshuffle", "CurseForge - Share with friends! (Ctrl+C to copy)")
     end)
 
-    -- Icon placeholder for CurseForge (16x16 recommended)
-    local spreadIcon = spreadButton:CreateTexture(nil, "ARTWORK")
-    spreadIcon:SetSize(16, 16)
-    spreadIcon:SetPoint("LEFT", spreadButton, "LEFT", 8, 0)
-    -- spreadIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\curseforge")  -- Uncomment when icon added
-    spreadButton.icon = spreadIcon
+    local curseforgeIcon = spreadButton:CreateTexture(nil, "ARTWORK")
+    curseforgeIcon:SetSize(16, 16)
+    curseforgeIcon:SetPoint("LEFT", spreadButton, "LEFT", 8, 0)
+    curseforgeIcon:SetTexture("Interface\\AddOns\\QuietShuffle\\media\\curseforge")
+    spreadButton.Text:SetPoint("CENTER", spreadButton, "CENTER", 8, 0)
 
     panel:HookScript("OnShow", function()
         if addon.IsEnabled then
@@ -271,9 +413,11 @@ local function CreateSettingsPanel()
         end
         QuietShuffleLDBIconDB = QuietShuffleLDBIconDB or {}
         minimapCheckbox:SetChecked(not QuietShuffleLDBIconDB.hide)
-        -- Load saved chat frame name
+        -- Load saved chat frame selection
         addon.savedData = addon.savedData or {}
-        chatFrameInput:SetText(addon.savedData.outputChatFrame or "")
+        if addon.RefreshChatFrameDropdown then
+            addon.RefreshChatFrameDropdown()
+        end
     end)
 
     return panel

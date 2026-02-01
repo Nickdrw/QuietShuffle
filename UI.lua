@@ -336,7 +336,7 @@ addon.ShowSessionMessages = function(sessionIndex)
         row:SetWidth(addon.historyMessageContentFrame:GetWidth())
         local rowHeight = 24
         if msgData then
-            local searchFilter = addon.searchFilter or nil
+            local searchFilter = addon.searchFilter
             local parts = FormatChatMessageParts(msgData)
             
             -- Check if this row matches the search
@@ -425,6 +425,7 @@ addon.ShowSessionMessages = function(sessionIndex)
             if addon.messageRows[i] then
                 addon.messageRows[i]:Hide()
                 addon.messageRows[i].msgData = nil
+                addon.messageRows[i].highlightBg:Hide()
             end
         end
 
@@ -651,23 +652,50 @@ addon.CreateHistoryWindow = function()
     searchBox:SetSize(180, 22)
     searchBox:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -35, -35)
     searchBox:SetAutoFocus(false)
+    
+    -- Debounce timer for search refresh
+    local searchRefreshTimer = nil
+    local function RefreshCurrentSessionForSearch()
+        searchRefreshTimer = nil
+        -- Refresh current session to apply search highlighting
+        if addon.selectedSessionIndex and addon.selectedSessionIndex > 0 then
+            addon.ShowSessionMessages(addon.selectedSessionIndex)
+        end
+    end
+    
     searchBox:SetScript("OnTextChanged", function(self)
         SearchBoxTemplate_OnTextChanged(self)
         addon.searchFilter = self:GetText():lower()
         addon.PopulateSessionList()
+        
+        -- Cancel previous timer if still pending
+        if searchRefreshTimer then
+            searchRefreshTimer:Cancel()
+        end
+        
+        -- Set debounced refresh for current session (300ms delay)
+        searchRefreshTimer = C_Timer.After(0.3, RefreshCurrentSessionForSearch)
     end)
     searchBox:SetScript("OnEscapePressed", function(self)
         self:SetText("")
         self:ClearFocus()
         addon.searchFilter = nil
         addon.PopulateSessionList()
+        
+        -- Refresh current session to clear highlighting
+        if searchRefreshTimer then
+            searchRefreshTimer:Cancel()
+        end
+        if addon.selectedSessionIndex and addon.selectedSessionIndex > 0 then
+            addon.ShowSessionMessages(addon.selectedSessionIndex)
+        end
     end)
     addon.searchBox = searchBox
 
 
     local sessionPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     sessionPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -65)
-    sessionPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 260, 40)
+    sessionPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 260, 10)
     sessionPanel:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -699,7 +727,7 @@ addon.CreateHistoryWindow = function()
 
     local messagePanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     messagePanel:SetPoint("TOPLEFT", separator, "TOPRIGHT", 15, 0)
-    messagePanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 70)
+    messagePanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 55)
     messagePanel:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
