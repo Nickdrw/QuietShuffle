@@ -391,7 +391,7 @@ addon.ShowSessionMessages = function(sessionIndex)
             row.nameButton:SetSize(nameW + 4, nameH + 4)
 
             local textHeight = row.messageText:GetStringHeight() or 0
-            rowHeight = math.max(24, textHeight + 6)
+            local rowHeight = math.max(24, textHeight + 6)
             row:SetHeight(rowHeight)
             
             -- Size and position highlight to cover full row width but only text line height
@@ -402,6 +402,9 @@ addon.ShowSessionMessages = function(sessionIndex)
             else
                 row.highlightBg:Hide()
             end
+            
+            row:SetPoint("TOPLEFT", addon.historyMessageContentFrame, "TOPLEFT", 0, -yOffset)
+            yOffset = yOffset + rowHeight + 2
         else
             row.prefixText:Hide()
             row.nameText:Hide()
@@ -412,11 +415,11 @@ addon.ShowSessionMessages = function(sessionIndex)
             row.text:SetText(text)
 
             local textHeight = row.text:GetStringHeight() or 0
-            rowHeight = math.max(24, textHeight + 6)
+            local rowHeight = math.max(24, textHeight + 6)
             row:SetHeight(rowHeight)
+            row:SetPoint("TOPLEFT", addon.historyMessageContentFrame, "TOPLEFT", 0, -yOffset)
+            yOffset = yOffset + rowHeight + 2
         end
-        row:SetPoint("TOPLEFT", addon.historyMessageContentFrame, "TOPLEFT", 0, -yOffset)
-        yOffset = yOffset + rowHeight + 2
     end
 
     local function FinalizeDisplay(messages)

@@ -281,12 +281,12 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
     end
     
     -- Dedupe using lineID to prevent duplicate captures from multiple filter registrations
-    if lineID and lineID > 0 then
+    if msgLineID and msgLineID > 0 then
         addon._seenLineIDs = addon._seenLineIDs or {}
-        if addon._seenLineIDs[lineID] then
+        if addon._seenLineIDs[msgLineID] then
             return true  -- still suppress, but don't re-record
         end
-        addon._seenLineIDs[lineID] = true
+        addon._seenLineIDs[msgLineID] = true
         -- Clean old lineIDs periodically (keep last 100)
         local count = 0
         for _ in pairs(addon._seenLineIDs) do count = count + 1 end
