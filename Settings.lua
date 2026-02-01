@@ -98,8 +98,7 @@ local function CreateSettingsPanel()
     -- 4-column layout (label/control pairs)
     local col1X = 16
     local col2X = 260
-    local col3X = 420
-    local col4X = 660
+    -- col3X and col4X reserved for future use
 
     -- Enable QuietShuffle
     local enableLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")

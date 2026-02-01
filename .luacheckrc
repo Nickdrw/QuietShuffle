@@ -7,8 +7,10 @@ codes = true
 -- Ignore whitespace warnings and unused self/level arguments (common in WoW callbacks)
 ignore = {
     "211/_.*",  -- unused variables starting with _
+    "211/FormatMessageCount",  -- reserved for future use
     "212/self", -- unused self argument
     "212/level", -- unused level argument (dropdown callbacks)
+    "121/SetItemRef",  -- we override this global intentionally
     "611",      -- line contains only whitespace
     "612",      -- line contains trailing whitespace
     "614",      -- trailing whitespace in comment

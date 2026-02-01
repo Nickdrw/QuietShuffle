@@ -291,7 +291,7 @@ addon.RefreshMatchPlayers = function()
 
     -- Helper to safely add a player (handles "secret" values in rated PvP)
     local function SafeAddPlayer(unitID)
-        local ok, err = pcall(function()
+        pcall(function()
             local name, realm = UnitFullName(unitID)
             -- Skip if name is nil or secret
             if not name or name == "" then return end
@@ -618,10 +618,7 @@ frame:SetScript("OnEvent", function(self, event)
         if addon.savedData.outputChatFrame and addon.savedData.outputChatFrame ~= "" then
             addon.useDedicatedChatFrame = true
             -- Try to find and cache the frame immediately
-            local frame = addon.FindChatFrameByName(addon.savedData.outputChatFrame)
-            if frame then
-                addon.dedicatedChatFrame = frame
-            end
+            addon.dedicatedChatFrame = addon.FindChatFrameByName(addon.savedData.outputChatFrame)
         end
 
         -- Validate chat frame selection after a short delay to handle late-loading frames
@@ -631,10 +628,11 @@ frame:SetScript("OnEvent", function(self, event)
             end
         end)
 
-        if addon.RegisterMinimapIcon and addon.RegisterMinimapIcon() then
-            -- LibDBIcon handled
-        elseif addon.CreateMinimapButton then
-            addon.CreateMinimapButton()
+        if not (addon.RegisterMinimapIcon and addon.RegisterMinimapIcon()) then
+            -- LibDBIcon not available, fall back to custom button
+            if addon.CreateMinimapButton then
+                addon.CreateMinimapButton()
+            end
         end
 
         addon.Print("Ready! Use /qs history to view messages or /qs for help.")

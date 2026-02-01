@@ -261,13 +261,13 @@ addon.InterceptChatMessage = function(self, event, message, sender, ...)
     local arg12 = select(12, ...)
     
     -- Try to find lineID (numeric > 0)
-    local lineID = nil
+    local msgLineID = nil
     if type(arg9) == "number" and arg9 > 0 then
-        lineID = arg9
+        msgLineID = arg9
     elseif type(arg11) == "number" and arg11 > 0 then
-        lineID = arg11
+        msgLineID = arg11
     elseif type(arg10) == "number" and arg10 > 0 then
-        lineID = arg10
+        msgLineID = arg10
     end
     
     -- Try to find guid (string matching Player-*)

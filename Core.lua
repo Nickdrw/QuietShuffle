@@ -433,7 +433,7 @@ addon.CleanupOldSessions = function(key)
     if #history > addon.MAX_SESSIONS_PER_CHARACTER then
         -- Remove oldest sessions, keeping only the most recent MAX_SESSIONS_PER_CHARACTER
         local toRemove = #history - addon.MAX_SESSIONS_PER_CHARACTER
-        for i = 1, toRemove do
+        for _ = 1, toRemove do
             table.remove(history, 1)  -- Remove from front (oldest)
         end
     end
@@ -669,7 +669,7 @@ addon.CreateMinimapButton = function()
 
     button:RegisterForDrag("LeftButton")
     button:SetScript("OnDragStart", function(self)
-        self:SetScript("OnUpdate", function(self)
+        self:SetScript("OnUpdate", function()
             local mx, my = Minimap:GetCenter()
             local cx, cy = GetCursorPosition()
             local scale = Minimap:GetEffectiveScale()

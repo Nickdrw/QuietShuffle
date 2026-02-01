@@ -334,7 +334,6 @@ addon.ShowSessionMessages = function(sessionIndex)
         row.msgData = msgData
         row.isFiltered = false
         row:SetWidth(addon.historyMessageContentFrame:GetWidth())
-        local rowHeight = 24
         if msgData then
             local searchFilter = addon.searchFilter
             local parts = FormatChatMessageParts(msgData)
@@ -480,6 +479,8 @@ addon.ShowSessionMessages = function(sessionIndex)
     FinalizeDisplay(reportMessages)
 end
 
+-- FormatMessageCount: Formats message count with proper pluralization
+-- Usage: FormatMessageCount(5) returns "5 messages"
 local function FormatMessageCount(count)
     if count == 1 then
         return count .. " message"
@@ -496,7 +497,6 @@ addon.PopulateSessionList = function()
 
     local yOffset = 0
     local sessionCount = 0
-    local messageCount = 0
     local searchFilter = addon.searchFilter and addon.searchFilter:lower() or nil
     local selectedSessionVisible = false
 
@@ -526,9 +526,7 @@ addon.PopulateSessionList = function()
         local sessionIndex = i
 
         -- Skip sessions that don't match search filter
-        if not SessionMatchesSearch(session) then
-            -- continue to next iteration
-        else
+        if SessionMatchesSearch(session) then
             sessionCount = sessionCount + 1
             
             -- Track if the currently selected session is visible
@@ -608,7 +606,7 @@ addon.PopulateSessionList = function()
 
         table.insert(addon.sessionButtons, button)
         yOffset = yOffset - 32
-        end  -- end of SessionMatchesSearch else block
+        end  -- end of SessionMatchesSearch if block
     end
     
     -- If search hides the selected session (or no sessions match), clear selection and refresh messages
@@ -875,7 +873,7 @@ addon.ShowHistoryWindow = function()
 end
 
 -- Handle clickable link in chat
-hooksecurefunc("SetItemRef", function(link, text, button)
+hooksecurefunc("SetItemRef", function(link)
     if link and string.find(link, "^quietshuffle:") then
         local command = string.match(link, "^quietshuffle:([^:]+)")
         if command == "history" then
