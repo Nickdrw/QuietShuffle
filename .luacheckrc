@@ -4,6 +4,16 @@ std = "lua51"
 max_line_length = false
 codes = true
 
+-- Ignore whitespace warnings and unused self/level arguments (common in WoW callbacks)
+ignore = {
+    "211/_.*",  -- unused variables starting with _
+    "212/self", -- unused self argument
+    "212/level", -- unused level argument (dropdown callbacks)
+    "611",      -- line contains only whitespace
+    "612",      -- line contains trailing whitespace
+    "614",      -- trailing whitespace in comment
+}
+
 -- Exclude external libraries
 exclude_files = {
     "Libs/**",
@@ -12,8 +22,11 @@ exclude_files = {
 -- Global variables we define
 globals = {
     "QuietShuffleSavedData",
+    "QuietShuffleLDBIconDB",
     "SLASH_QUIETSHUFFLE1",
+    "SLASH_QUIETSHUFFLE2",
     "SlashCmdList",
+    "SetItemRef",  -- we hook this
 }
 
 -- WoW API globals we read from
@@ -37,8 +50,15 @@ read_globals = {
     "ChatFontNormal",
     "Settings",
     "InterfaceOptionsFrame_OpenToCategory",
+    "InterfaceOptions_AddCategory",
+    "InterfaceOptionsFrame",
+    "SettingsPanel",
+    "HideUIPanel",
     "StaticPopupDialogs",
     "StaticPopup_Show",
+    "StaticPopup_ShowCustomGenericConfirmation",
+    "UISpecialFrames",
+    "hooksecurefunc",
     
     -- Chat Frame API
     "ChatFrame_AddMessageEventFilter",
@@ -46,31 +66,70 @@ read_globals = {
     "DEFAULT_CHAT_FRAME",
     "NUM_CHAT_WINDOWS",
     "FCF_GetCurrentChatFrame",
+    "FCF_OpenNewWindow",
+    "FCFDock_GetChatFrames",
+    "GENERAL_CHAT_DOCK",
+    "DOCKED_CHAT_FRAMES",
+    "ChatTypeInfo",
+    "COMBAT_LOG",
+    
+    -- UIDropDownMenu API
+    "UIDropDownMenu_Initialize",
+    "UIDropDownMenu_CreateInfo",
+    "UIDropDownMenu_AddButton",
+    "UIDropDownMenu_SetWidth",
+    "UIDropDownMenu_SetText",
+    "UIDropDownMenu_SetSelectedValue",
+    "UIDropDownMenu_JustifyText",
     
     -- C_* namespaces
     "C_PvP",
     "C_Timer",
     "C_Scenario",
     "C_ChatInfo",
+    "C_CVar",
+    "C_SocialRestrictions",
+    "C_PlayerInfo",
+    "C_ReportSystem",
+    
+    -- CVar functions
+    "GetCVar",
+    "SetCVar",
     
     -- Event/Frame functions
     "GetBattlefieldStatus",
     "IsInInstance",
     "IsActiveBattlefieldArena",
+    "IsInScenario",
+    "GetScenarioID",
     "GetNumGroupMembers",
     "IsInGroup",
     "IsInRaid",
     "UnitName",
+    "UnitFullName",
     "UnitGUID",
     "UnitClass",
     "UnitExists",
     "GetRealmName",
+    "GetRealZoneText",
     "GetPlayerInfoByGUID",
     "GetClassColor",
+    "GetCursorPosition",
     "Ambiguate",
+    "SetItemRef",
+    "UnitPopup_ShowMenu",
+    "SearchBoxTemplate_OnTextChanged",
+    
+    -- Player/Location
+    "PlayerLocation",
+    "ReportInfo",
+    "ReportFrame",
     
     -- Library globals
     "LibStub",
+    
+    -- Minimap
+    "Minimap",
     
     -- Chat frame globals (ChatFrame1 through ChatFrame10)
     "ChatFrame1",
