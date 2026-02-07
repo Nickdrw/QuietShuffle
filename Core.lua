@@ -281,17 +281,17 @@ addon.ShowSupportPopup = function()
 end
 
 -- Hook all chat frames for hyperlink handling
-local originalSetItemRef = SetItemRef
-SetItemRef = function(link, text, button, chatFrame)
+-- IMPORTANT: Use hooksecurefunc to avoid tainting the secure SetItemRef execution path.
+-- Directly replacing SetItemRef causes ADDON_ACTION_FORBIDDEN errors in M+ and rated PvP
+-- because the tainted wrapper breaks downstream protected calls like SendChatMessage/SendWhisper.
+hooksecurefunc("SetItemRef", function(link, _text, _button, _chatFrame)
     local addonName, action = link:match("^addon:([^:]+):(.+)$")
     if addonName == "QuietShuffle" then
         if action == "settings" then
             addon.ShowSupportPopup()
         end
-        return
     end
-    return originalSetItemRef(link, text, button, chatFrame)
-end
+end)
 
 -- ============================================================================
 -- SAVEDVARIABLES SETUP - Initialize persistent storage
