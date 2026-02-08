@@ -3,6 +3,8 @@
 ## Notes: QuietShuffle allows you to hide every communication channel from your solo shuffle lobby
 ## Author: NickDrew
 ## Version: 0.1.0
+## IconTexture: Interface/AddOns/QuietShuffle/Media/quietshuffleicon.tga
+## Category: Chat
 ## SavedVariables: QuietShuffleSavedData, QuietShuffleLDBIconDB
 ## X-Curse-Project-ID: 1449682
 ## X-Wago-ID: ZKxZEqNk
