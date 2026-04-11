@@ -4,11 +4,11 @@
 
 # QuietShuffle
 
-Tired of being rage‑baited during your games? QuietShuffle lets you play the way you want, the best you can, without getting disturbed by ragers. After the game, you can peacefully review messages and take action if necessary. Compatible with **TWW** and **Midnight**.
+Tired of being rage‑baited during your games? QuietShuffle lets you play the way you want, the best you can, without getting disturbed by ragers. After the game, you can peacefully review messages and take action if necessary.
 
 ## Features
 - Automatic Solo Shuffle detection and session tracking.
-- Chat filtering with full message capture (nothing is lost).
+- Chat filtering with full message capture.
 - Per‑character session history.
 - Lightweight history UI with efficient row reuse.
 - Report workflow integration when line IDs are available.
@@ -21,7 +21,6 @@ Tired of being rage‑baited during your games? QuietShuffle lets you play the w
 1. Copy the QuietShuffle folder into:
 	- `World of Warcraft/_retail_/Interface/AddOns/`
 2. In game, type `/reload` or restart the client.
-3. Enable the addon from the character select screen if needed.
 
 You can also download QuietShuffle from Wago.io or CurseForge.
 
