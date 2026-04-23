@@ -339,6 +339,10 @@ end
 
 -- Register message interception using the official filter API
 addon.EnableMessageFiltering = function()
+    if addon.IsEnabled and not addon.IsEnabled() then
+        addon.filteringEnabled = false
+        return
+    end
     if addon.filteringEnabled then
         return
     end

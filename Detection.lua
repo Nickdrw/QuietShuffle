@@ -17,6 +17,9 @@ addon._originalChatDisabledState = nil
 
 -- Mute all chat during round (gates open → first blood)
 addon.MuteRoundChat = function()
+    if addon.IsEnabled and not addon.IsEnabled() then
+        return
+    end
     if addon._roundChatMuted then return end
     
     -- Remember original state so we can restore it properly
@@ -79,6 +82,9 @@ end)
 -- Note: We disable all three bubble CVars to cover all chat types in arenas:
 -- chatBubbles (general), chatBubblesParty (party/instance), chatBubblesRaid (raid/instance)
 local function DisableChatBubbles()
+    if addon.IsEnabled and not addon.IsEnabled() then
+        return
+    end
     if not addon.chatBubbleState then
         addon.chatBubbleState = {
             chatBubbles = GetCVar("chatBubbles"),
@@ -341,11 +347,8 @@ end
 -- Check if we're in Solo Shuffle and toggle muting accordingly
 addon.CheckSoloShuffleStatus = function()
     if addon.IsEnabled and not addon.IsEnabled() then
-        if addon.filteringEnabled and addon.DisableMessageFiltering then
-            addon.DisableMessageFiltering()
-        end
-        if addon.RestoreChatBubbles then
-            addon.RestoreChatBubbles()
+        if addon.DeactivateRuntimeState then
+            addon.DeactivateRuntimeState(true)
         end
         return
     end
@@ -543,13 +546,28 @@ frame:SetScript("OnEvent", function(self, event)
     end
     
     if event == "PLAYER_LOGIN" then
+        if not QuietShuffleSavedData then
+            QuietShuffleSavedData = {
+                history = {}
+            }
+        end
+
+        addon.savedData = QuietShuffleSavedData
+
+        local enabled = true
+        if addon.IsEnabled then
+            enabled = addon.IsEnabled()
+        end
+
         -- Safety: restore chat if it was left muted from a crash/disconnect
-        if C_SocialRestrictions and C_SocialRestrictions.IsChatDisabled 
+        if C_SocialRestrictions and C_SocialRestrictions.IsChatDisabled
+           and C_SocialRestrictions.SetChatDisabled
            and C_SocialRestrictions.IsChatDisabled() then
-            -- Only restore if we're not in an arena (crash during match)
             local inInstance, instanceType = IsInInstance()
-            if not inInstance or instanceType ~= "arena" then
+            if not enabled or not inInstance or instanceType ~= "arena" then
                 C_SocialRestrictions.SetChatDisabled(false)
+                addon._roundChatMuted = false
+                addon._originalChatDisabledState = nil
             end
         end
         
@@ -557,13 +575,20 @@ frame:SetScript("OnEvent", function(self, event)
         -- This handles disconnect/reconnect scenarios
         -- Only runs on actual login/reconnect, not on entering arena normally
         local inInstance, instanceType = IsInInstance()
-        if inInstance and instanceType == "arena" then
+        if enabled and inInstance and instanceType == "arena" then
             -- We're already in arena at login time = reconnect scenario
             -- Normal entry would have PLAYER_ENTERING_WORLD fire after loading
             -- Mark that this is a reconnect so CheckSoloShuffleStatus doesn't double-announce
             addon._isReconnect = true
             -- Delay the check slightly to let APIs initialize after login
             C_Timer.After(1, function()
+                if addon.IsEnabled and not addon.IsEnabled() then
+                    if addon.DeactivateRuntimeState then
+                        addon.DeactivateRuntimeState(true)
+                    end
+                    addon._isReconnect = false
+                    return
+                end
                 -- Only start if we're still not in solo shuffle (CheckSoloShuffleStatus may have already started it)
                 if addon.IsSoloShuffleMatch() and not addon.inSoloShuffle then
                     -- Check if there's a saved session to restore
@@ -604,15 +629,9 @@ frame:SetScript("OnEvent", function(self, event)
                 end
                 addon._isReconnect = false
             end)
+        elseif not enabled and addon.DeactivateRuntimeState then
+            addon.DeactivateRuntimeState(true)
         end
-        
-        if not QuietShuffleSavedData then
-            QuietShuffleSavedData = {
-                history = {}
-            }
-        end
-
-        addon.savedData = QuietShuffleSavedData
 
         local currentKey = addon.GetCharacterKey()
         if addon.savedData.history and type(addon.savedData.history) == "table" then
@@ -681,7 +700,11 @@ frame:SetScript("OnEvent", function(self, event)
         -- Pre-register filters early when entering any arena to avoid missing early messages
         -- The filter callback checks addon.filteringEnabled before suppressing, so this is safe
         if event == "PLAYER_ENTERING_BATTLEGROUND" or event == "PVP_MATCH_ACTIVE" or event == "PVP_MATCH_STATE_CHANGED" then
-            if IsInInstance then
+            local addonEnabled = true
+            if addon.IsEnabled then
+                addonEnabled = addon.IsEnabled()
+            end
+            if addonEnabled and IsInInstance then
                 local _, instanceType = IsInInstance()
                 if instanceType == "arena" and addon.EnableMessageFiltering then
                     -- Pre-enable filtering; CheckSoloShuffleStatus will set inSoloShuffle if appropriate

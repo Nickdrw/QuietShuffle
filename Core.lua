@@ -328,20 +328,39 @@ addon.IsEnabled = function()
     return addon.savedData == nil or addon.savedData.enabled ~= false
 end
 
+addon.DeactivateRuntimeState = function(clearActiveSession)
+    if addon.DisableMessageFiltering then
+        addon.DisableMessageFiltering()
+    end
+    if addon.UnmuteRoundChat then
+        addon.UnmuteRoundChat()
+    end
+
+    addon.filteringEnabled = false
+    addon.inSoloShuffle = false
+    addon._isReconnect = false
+
+    addon.matchPlayers = addon.matchPlayers or {}
+    addon.matchPlayersFull = addon.matchPlayersFull or {}
+    addon.matchPlayerGuids = addon.matchPlayerGuids or {}
+    wipe(addon.matchPlayers)
+    wipe(addon.matchPlayersFull)
+    wipe(addon.matchPlayerGuids)
+
+    if addon.RestoreChatBubbles then
+        addon.RestoreChatBubbles()
+    end
+    if clearActiveSession and addon.ClearActiveSession then
+        addon.ClearActiveSession()
+    end
+end
+
 addon.SetEnabled = function(enabled)
     addon.savedData = addon.savedData or {}
     addon.savedData.enabled = enabled and true or false
     if not addon.savedData.enabled then
-        if addon.DisableMessageFiltering then
-            addon.DisableMessageFiltering()
-        end
-        addon.filteringEnabled = false
-        addon.inSoloShuffle = false
-        addon.matchPlayers = {}
-        addon.matchPlayersFull = {}
-        addon.matchPlayerGuids = {}
-        if addon.RestoreChatBubbles then
-            addon.RestoreChatBubbles()
+        if addon.DeactivateRuntimeState then
+            addon.DeactivateRuntimeState(true)
         end
     else
         if addon.CheckSoloShuffleStatus then
